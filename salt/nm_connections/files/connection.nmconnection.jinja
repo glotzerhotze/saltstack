@@ -1,0 +1,8 @@
+# Managed by Salt (nm_connections formula). Local changes will be overwritten.
+{%- for section, options in sections %}
+
+[{{ section }}]
+{%-   for key, value in options %}
+{{ key }}={{ value }}
+{%-   endfor %}
+{%- endfor %}

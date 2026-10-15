@@ -1,0 +1,20 @@
+# Defaults for the nm_connections formula. Pillar data under the
+# `nm_connections` key is deep-merged on top of this.
+nm_connections:
+  # Where NetworkManager's keyfile plugin reads system-wide profiles from.
+  config_dir: /etc/NetworkManager/system-connections
+
+  # Run `nmcli connection reload` after files changed (only when
+  # NetworkManager is active and the system is not transactional).
+  reload: true
+
+  # Seconds `nmcli --wait` waits when a connection is (re)activated.
+  activate_timeout: 60
+
+  # Remove every regular file in config_dir that is not declared under
+  # `connections` and whose name does not match a `purge_keep` regex.
+  purge: false
+  purge_keep: []
+
+  # <name>: {ensure: present|absent, activate: bool, settings: {...}}
+  connections: {}

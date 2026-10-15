@@ -1,0 +1,92 @@
+# Example pillar for the nm_connections formula.
+#
+# Settings are NetworkManager *keyfile* settings, written as either
+#   section.key: value            (flat, what the MLM form produces)
+#   section: {key: value, ...}    (nested, handy in hand-written pillar)
+# Both styles can be mixed within one profile. Values are written unescaped;
+# the formula handles keyfile escaping. YAML lists become "a;b;" lists,
+# YAML booleans become true/false.
+#
+# Reference for section/key names: `man nm-settings-keyfile`, or create a
+# profile once with nmcli and copy what lands in system-connections/.
+
+nm_connections:
+  # config_dir: /etc/NetworkManager/system-connections
+  reload: true            # nmcli connection reload after changes
+  activate_timeout: 60    # nmcli --wait for "activate: true" profiles
+
+  # Delete undeclared files in config_dir. Removing a profile that is
+  # active takes its device down - try with test=True first.
+  purge: false
+  purge_keep:             # Python regexes, matched against the file name
+    - '^wlan-'
+
+  connections:
+
+    # Static management NIC - flat notation, as the MLM form stores it.
+    # No uuid given: an existing uuid in mgmt.nmconnection is kept,
+    # otherwise a stable one is derived from minion id + profile name.
+    mgmt:
+      settings:
+        connection.type: ethernet
+        connection.interface-name: eth0
+        connection.autoconnect-priority: 10
+        ipv4.method: manual
+        ipv4.address1: 10.10.0.21/24
+        ipv4.gateway: 10.10.0.1
+        ipv4.dns: [10.10.0.53, 10.10.1.53]
+        ipv4.dns-search: [example.com]
+        ipv6.method: disabled
+
+    # LACP bond with two ports - nested notation.
+    bond0:
+      settings:
+        connection: {type: bond, interface-name: bond0}
+        bond: {mode: 802.3ad, miimon: 100, lacp_rate: fast, xmit_hash_policy: layer3+4}
+        ethernet: {mtu: 9000}
+        ipv4: {method: disabled}
+        ipv6: {method: disabled}
+
+    # master/slave-type are understood by every NM version; NM >= 1.46 also
+    # accepts controller/port-type.
+    bond0-port-eth1:
+      settings:
+        connection: {type: ethernet, interface-name: eth1, master: bond0, slave-type: bond}
+    bond0-port-eth2:
+      settings:
+        connection: {type: ethernet, interface-name: eth2, master: bond0, slave-type: bond}
+
+    # VLAN on top of the bond, brought up right after it changes.
+    bond0.100:
+      activate: true
+      settings:
+        connection.type: vlan
+        connection.interface-name: bond0.100
+        vlan.parent: bond0
+        vlan.id: 100
+        ipv4.method: manual
+        ipv4.address1: 192.168.100.5/24
+        ipv6.method: disabled
+
+    # Pin the UUID explicitly when a profile is referenced elsewhere
+    # (e.g. by another profile's master= or by monitoring).
+    backup:
+      settings:
+        connection:
+          type: ethernet
+          uuid: 6f1c2a52-4d7e-4b55-9a0b-2b7c3c1d9e10
+          interface-name: eth3
+          autoconnect: false
+        ipv4: {method: auto}
+
+    # Sections whose names contain dots (WireGuard peers) need the nested form.
+    # wg0:
+    #   settings:
+    #     connection: {type: wireguard, interface-name: wg0}
+    #     wireguard: {private-key: "..."}
+    #     "wireguard-peer.<peer public key>": {endpoint: "vpn.example.com:51820", allowed-ips: [0.0.0.0/0]}
+    #     ipv4: {method: manual, address1: 10.99.0.2/32}
+
+    # Remove a profile created by the installer.
+    Wired connection 1:
+      ensure: absent

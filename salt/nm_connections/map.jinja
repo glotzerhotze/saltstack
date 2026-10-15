@@ -1,0 +1,10 @@
+{#- Merge formula / pillar data on top of the formula defaults. -#}
+{%- import_yaml tpldir ~ "/defaults.yaml" as defaults %}
+{%- set nm = salt['pillar.get']('nm_connections',
+                                default=defaults.nm_connections,
+                                merge=True) %}
+{#- Formula-with-Forms can save empty edit-groups as null -#}
+{%- do nm.update({
+      'connections': nm.get('connections') or {},
+      'purge_keep': nm.get('purge_keep') or [],
+    }) %}
