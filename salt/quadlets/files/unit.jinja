@@ -1,0 +1,8 @@
+{{ marker }}
+{%- for section, pairs in sections if pairs %}
+
+[{{ section }}]
+{%-   for pair in pairs %}
+{{ pair[0] }}={{ pair[1] }}
+{%-   endfor %}
+{%- endfor %}

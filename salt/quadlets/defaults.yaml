@@ -1,0 +1,51 @@
+# -*- coding: utf-8 -*-
+# vim: ft=yaml
+#
+# Default settings for the quadlet formula. Everything here can be
+# overridden in pillar under the `quadlet` key.
+---
+quadlet:
+  # Install podman with pkg.installed
+  manage_package: true
+  pkg: podman
+
+  # When false, only the unit files are written: no daemon-reload, no image
+  # pulls, no service start/stop, no network re-creation.
+  manage_services: true
+
+  # Rootful quadlet search path (macvlan with static IP/MAC needs rootful)
+  config_dir: /etc/containers/systemd
+
+  # Pull images during the Salt run (before the service is (re)started), so
+  # a slow pull never runs into the systemd start timeout and a bad image
+  # name fails the highstate instead of a unit.
+  pull_images: true
+
+  # The one macvlan network all quadlets are attached to
+  network:
+    name: macvlan            # -> macvlan.network, podman network "macvlan"
+    driver: macvlan
+    parent: ~                # host interface, e.g. eth0 or bond0.20 (required)
+    mode: ~                  # macvlan mode: bridge | private | vepa | passthru
+    subnet: ~                # string or list (required)
+    gateway: ~               # string or list
+    ip_range: ~              # string or list; pool for quadlets without a static IP
+    ipv6: false
+    options: {}              # extra driver options -> Options=key=value
+    # Quadlet only creates a network if it does not exist yet, so changes to
+    # the .network file are ignored by podman. With this enabled the formula
+    # stops the attached quadlets, removes the podman network and lets it be
+    # re-created whenever the .network file changes.
+    recreate_on_change: true
+
+  # Merged into every container (container settings win)
+  container_defaults:
+    running: true            # service.running (false -> service.dead)
+    enabled: true            # render [Install] so the unit starts at boot
+    Service:
+      Restart: always
+      TimeoutStartSec: 900
+    Install:
+      WantedBy: multi-user.target
+
+  containers: {}

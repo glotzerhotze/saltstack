@@ -1,0 +1,313 @@
+{#- -*- coding: utf-8 -*- #}
+{#- vim: ft=jinja #}
+{#-
+  Merges defaults.yaml with pillar, validates it and normalizes everything the
+  states and the unit template need. Exports:
+
+    quadlet       merged settings
+    q_marker      header line written into every managed unit file
+    q_network     {name, file, service, sections}
+    q_containers  normalized containers that should exist
+    q_absent      normalized containers marked `absent: true`
+    q_expected    basenames of all unit files this formula currently owns
+
+  Invalid pillar aborts rendering with a list of every problem found, so a
+  broken pillar never gets half-applied.
+#}
+{%- import_yaml tpldir ~ '/defaults.yaml' as defaults %}
+{%- set quadlet = salt['slsutil.merge'](defaults.quadlet, salt['pillar.get']('quadlet', {}), merge_lists=False) %}
+{%- set q_marker = '# Managed by Salt (quadlet formula) - local changes will be overwritten' %}
+{%- set config_dir = quadlet.config_dir | string %}
+{%- set errors = [] %}
+
+{#- Append `Key=value` pairs from a mapping; list values repeat the key. #}
+{%- macro add_pairs(pairs, data) %}
+{%-   for key, value in (data or {}).items() %}
+{%-     set items = [value] if (value is string or value is number or value is mapping) else (value if value is not none else []) %}
+{%-     for item in items %}
+{%-       if item is sameas true %}{%- do pairs.append([key | string, 'true']) %}
+{%-       elif item is sameas false %}{%- do pairs.append([key | string, 'false']) %}
+{%-       elif item is not none %}{%- do pairs.append([key | string, item | string]) %}
+{%-       endif %}
+{%-     endfor %}
+{%-   endfor %}
+{%- endmacro %}
+
+{#- Capitalized keys in a config mapping are raw unit sections ([Unit], [Service], ...). #}
+{%- macro merge_sections(sections, cfg) %}
+{%-   for key, value in cfg.items() if (key | string)[:1].isupper() %}
+{%-     if key not in sections %}{%- do sections.update({key: []}) %}{%- endif %}
+{%-     do add_pairs(sections[key], value) %}
+{%-   endfor %}
+{%- endmacro %}
+
+{#- "KEY=value" quoted for Environment=/Label=; % and $ escaped so values stay literal. #}
+{%- macro kv_quote(key, value) -%}
+{%-   set value = 'true' if value is sameas true else ('false' if value is sameas false else value) -%}
+"{{ (key ~ '=' ~ value) | replace('\\', '\\\\') | replace('"', '\\"') | replace('%', '%%') | replace('$', '$$') }}"
+{%- endmacro %}
+
+{#- ------------------------------------------------------------------ network #}
+{%- set net = quadlet.network %}
+{%- set net_name = net.name | string %}
+{%- set subnets = [net.subnet] if net.subnet is string else (net.subnet or []) %}
+{%- set gateways = [net.gateway] if net.gateway is string else (net.gateway or []) %}
+{%- set ip_ranges = [net.ip_range] if net.ip_range is string else (net.ip_range or []) %}
+
+{%- if net_name | regex_match('^[A-Za-z0-9][A-Za-z0-9_.-]*$') is none %}
+{%-   do errors.append('network:name "' ~ net_name ~ '" is not a valid unit/network name') %}
+{%- endif %}
+{%- if not net.parent %}
+{%-   do errors.append('network:parent is required (host interface the macvlan sits on, e.g. eth0)') %}
+{%- endif %}
+{%- if not subnets %}
+{%-   do errors.append('network:subnet is required (static IPs need a subnet)') %}
+{%- endif %}
+
+{%- set net_pairs = [['NetworkName', net_name], ['Driver', net.driver | string]] %}
+{%- if net.parent %}{%- do net_pairs.append(['Options', 'parent=' ~ net.parent]) %}{%- endif %}
+{%- if net.mode %}{%- do net_pairs.append(['Options', 'mode=' ~ net.mode]) %}{%- endif %}
+{%- for key, value in (net.options or {}).items() %}
+{%-   do net_pairs.append(['Options', key ~ '=' ~ value]) %}
+{%- endfor %}
+{%- for s in subnets %}{%- do net_pairs.append(['Subnet', s | string]) %}{%- endfor %}
+{%- for g in gateways %}{%- do net_pairs.append(['Gateway', g | string]) %}{%- endfor %}
+{%- for r in ip_ranges %}{%- do net_pairs.append(['IPRange', r | string]) %}{%- endfor %}
+{%- if net.ipv6 %}{%- do net_pairs.append(['IPv6', 'true']) %}{%- endif %}
+
+{%- set net_sections = {'Unit': [], 'Network': net_pairs} %}
+{%- if 'Description' not in (net.get('Unit') or {}) %}
+{%-   do net_sections.Unit.append(['Description', net.driver ~ ' network ' ~ net_name ~ ' on ' ~ net.parent]) %}
+{%- endif %}
+{%- do merge_sections(net_sections, net) %}
+{%- set q_network = {
+      'name': net_name,
+      'file': config_dir ~ '/' ~ net_name ~ '.network',
+      'service': ((net.get('Network') or {}).get('ServiceName') or (net_name ~ '-network')) ~ '.service',
+      'sections': net_sections.items() | list,
+    } %}
+{%- set q_expected = [net_name ~ '.network'] %}
+
+{#- --------------------------------------------------------------- containers #}
+{%- set known_keys = [
+      'image', 'description', 'container_name', 'hostname',
+      'ip', 'ip6', 'mac', 'dns',
+      'environment', 'environment_files', 'labels',
+      'command', 'entrypoint', 'user', 'group', 'auto_update',
+      'volumes', 'running', 'enabled', 'pull',
+      'absent', 'purge_volumes',
+    ] %}
+{%- set q_containers = [] %}
+{%- set q_absent = [] %}
+{%- set seen = {'ip': {}, 'ip6': {}, 'mac': {}} %}
+
+{%- for cname, raw in (quadlet.containers or {}).items() %}
+{%-   set name = cname | string %}
+{%-   set c = salt['slsutil.merge'](quadlet.container_defaults, raw or {}, merge_lists=False) %}
+{%-   set is_absent = c.get('absent', false) %}
+{%-   set where = 'containers:' ~ name %}
+
+{%-   if name | regex_match('^[A-Za-z0-9][A-Za-z0-9_.-]*$') is none %}
+{%-     do errors.append(where ~ ': name may only contain letters, digits, ".", "_" and "-"') %}
+{%-   endif %}
+{%-   for key in c if not (key | string)[:1].isupper() and key not in known_keys %}
+{%-     do errors.append(where ~ ': unknown option "' ~ key ~ '" (raw unit keys go under Container:/Unit:/Service:/Install:)') %}
+{%-   endfor %}
+{%-   if not is_absent and not c.get('image') %}
+{%-     do errors.append(where ~ ': image is required') %}
+{%-   endif %}
+
+{#-   --- network attachment: static IPv4 / IPv6 / MAC #}
+{%-   set netopts = [] %}
+{%-   set ip = c.get('ip') %}
+{%-   if ip is not none %}
+{%-     set ip = ip | string %}
+{%-     if not (ip | is_ipv4) %}
+{%-       do errors.append(where ~ ': ip "' ~ ip ~ '" is not a valid IPv4 address') %}
+{%-     else %}
+{%-       set hits = [] %}
+{%-       for s in subnets %}
+{%-         if salt['network.ip_in_subnet'](ip, s | string) %}{%- do hits.append(s) %}{%- endif %}
+{%-       endfor %}
+{%-       if subnets and not hits %}
+{%-         do errors.append(where ~ ': ip ' ~ ip ~ ' is not inside network subnet(s) ' ~ subnets | join(', ')) %}
+{%-       endif %}
+{%-       if ip in gateways %}
+{%-         do errors.append(where ~ ': ip ' ~ ip ~ ' is the network gateway') %}
+{%-       endif %}
+{%-       if not is_absent %}
+{%-         if ip in seen.ip %}
+{%-           do errors.append(where ~ ': ip ' ~ ip ~ ' is already used by ' ~ seen.ip[ip]) %}
+{%-         endif %}
+{%-         do seen.ip.update({ip: name}) %}
+{%-       endif %}
+{%-     endif %}
+{%-     do netopts.append('ip=' ~ ip) %}
+{%-   endif %}
+
+{%-   set ip6 = c.get('ip6') %}
+{%-   if ip6 is not none %}
+{%-     set ip6 = ip6 | string %}
+{%-     if not (ip6 | is_ipv6) %}
+{%-       do errors.append(where ~ ': ip6 "' ~ ip6 ~ '" is not a valid IPv6 address') %}
+{%-     elif not is_absent %}
+{%-       if ip6 in seen.ip6 %}
+{%-         do errors.append(where ~ ': ip6 ' ~ ip6 ~ ' is already used by ' ~ seen.ip6[ip6]) %}
+{%-       endif %}
+{%-       do seen.ip6.update({ip6: name}) %}
+{%-     endif %}
+{%-     do netopts.append('ip6=' ~ ip6) %}
+{%-   endif %}
+
+{%-   set mac = c.get('mac') %}
+{%-   if mac == 'auto' %}
+{%-     if ip is not none and ip | is_ipv4 %}
+{%-       set o = ip.split('.') | map('int') | list %}
+{%-       set mac = '02:42:%02x:%02x:%02x:%02x' | format(o[0], o[1], o[2], o[3]) %}
+{%-     else %}
+{%-       do errors.append(where ~ ': mac "auto" needs a valid ip to derive the address from') %}
+{%-       set mac = none %}
+{%-     endif %}
+{%-   endif %}
+{%-   if mac is not none %}
+{%-     if mac is not string %}
+{%-       do errors.append(where ~ ': mac must be a quoted string (unquoted YAML may turn e.g. 12:34:56:00:11:22 into a number)') %}
+{%-     elif mac | regex_match('^([0-9a-f]{2}:){5}[0-9a-f]{2}$', ignorecase=True) is none %}
+{%-       do errors.append(where ~ ': mac "' ~ mac ~ '" is not of the form 02:00:00:00:00:01') %}
+{%-     else %}
+{%-       set mac = mac | lower %}
+{%-       if (mac[:2] | int(0, 16)) % 2 == 1 %}
+{%-         do errors.append(where ~ ': mac ' ~ mac ~ ' is a multicast address (first octet must be even; use a locally administered x2/x6/xA/xE prefix)') %}
+{%-       endif %}
+{%-       if not is_absent %}
+{%-         if mac in seen.mac %}
+{%-           do errors.append(where ~ ': mac ' ~ mac ~ ' is already used by ' ~ seen.mac[mac]) %}
+{%-         endif %}
+{%-         do seen.mac.update({mac: name}) %}
+{%-       endif %}
+{%-       do netopts.append('mac=' ~ mac) %}
+{%-     endif %}
+{%-   endif %}
+
+{#-   --- [Container] keys managed by the formula #}
+{%-   set cpairs = [
+        ['ContainerName', (c.get('container_name') or name) | string],
+        ['Image', (c.get('image') or '') | string],
+      ] %}
+{%-   if c.get('hostname', name) %}{%- do cpairs.append(['HostName', c.get('hostname', name) | string]) %}{%- endif %}
+{%-   do cpairs.append(['Network', net_name ~ '.network' ~ ((':' ~ netopts | join(',')) if netopts else '')]) %}
+{%-   set dns = c.get('dns') %}
+{%-   for d in ([dns] if dns is string else (dns or [])) %}{%- do cpairs.append(['DNS', d | string]) %}{%- endfor %}
+{%-   for key, value in (c.get('environment') or {}).items() %}
+{%-     do cpairs.append(['Environment', kv_quote(key, value)]) %}
+{%-   endfor %}
+{%-   set envf = c.get('environment_files') %}
+{%-   for f in ([envf] if envf is string else (envf or [])) %}{%- do cpairs.append(['EnvironmentFile', f | string]) %}{%- endfor %}
+{%-   for key, value in (c.get('labels') or {}).items() %}
+{%-     do cpairs.append(['Label', kv_quote(key, value)]) %}
+{%-   endfor %}
+
+{#-   --- volumes: named (own .volume unit), bind (host path) or raw string #}
+{%-   set named_volumes = [] %}
+{%-   set bind_dirs = [] %}
+{%-   set vol_seen = [] %}
+{%-   for v in (c.get('volumes') or []) %}
+{%-     if v is string %}
+{%-       do cpairs.append(['Volume', v]) %}
+{%-     elif v is mapping %}
+{%-       set target = v.get('target') %}
+{%-       set opts = v.get('options') %}
+{%-       set optstr = opts if opts is string else ((opts or []) | join(',')) %}
+{%-       set spec = none %}
+{%-       if not target or not (target | string).startswith('/') %}
+{%-         do errors.append(where ~ ': every volume needs an absolute target (got ' ~ v | json ~ ')') %}
+{%-       endif %}
+{%-       if v.get('name') and v.get('source') %}
+{%-         do errors.append(where ~ ': volume ' ~ v | json ~ ' has both name and source; use one') %}
+{%-       elif v.get('name') %}
+{%-         set vname = v.name | string %}
+{%-         set vunit = name ~ '-' ~ vname %}
+{%-         set vol_name = (v.get('volume_name') or vunit) | string %}
+{%-         if vname | regex_match('^[A-Za-z0-9][A-Za-z0-9_.-]*$') is none %}
+{%-           do errors.append(where ~ ': volume name "' ~ vname ~ '" is invalid') %}
+{%-         elif vname in vol_seen %}
+{%-           do errors.append(where ~ ': volume name "' ~ vname ~ '" is defined twice') %}
+{%-         endif %}
+{%-         do vol_seen.append(vname) %}
+{%-         set vsections = {'Unit': [], 'Volume': [['VolumeName', vol_name]]} %}
+{%-         if 'Description' not in (v.get('Unit') or {}) %}
+{%-           do vsections.Unit.append(['Description', 'Podman volume ' ~ vol_name ~ ' for ' ~ name]) %}
+{%-         endif %}
+{%-         do merge_sections(vsections, v) %}
+{%-         do named_volumes.append({
+              'unit': vunit,
+              'file': config_dir ~ '/' ~ vunit ~ '.volume',
+              'volume_name': vol_name,
+              'sections': vsections.items() | list,
+            }) %}
+{%-         set spec = vunit ~ '.volume:' ~ target %}
+{%-       elif v.get('source') %}
+{%-         set source = v.source | string %}
+{%-         if not source.startswith('/') %}
+{%-           do errors.append(where ~ ': bind source "' ~ source ~ '" must be an absolute path') %}
+{%-         endif %}
+{%-         if v.get('create', true) and not salt['file.file_exists'](source) %}
+{%-           do bind_dirs.append({
+                'path': source,
+                'user': v.get('user'),
+                'group': v.get('group'),
+                'mode': v.get('mode'),
+              }) %}
+{%-         endif %}
+{%-         set spec = source ~ ':' ~ target %}
+{%-       else %}
+{%-         do errors.append(where ~ ': volume ' ~ v | json ~ ' needs either name (podman volume) or source (host path)') %}
+{%-       endif %}
+{%-       if spec %}
+{%-         do cpairs.append(['Volume', spec ~ ((':' ~ optstr) if optstr else '')]) %}
+{%-       endif %}
+{%-     else %}
+{%-       do errors.append(where ~ ': volumes entries must be strings or mappings') %}
+{%-     endif %}
+{%-   endfor %}
+
+{%-   if c.get('entrypoint') %}{%- do cpairs.append(['Entrypoint', c.entrypoint | string]) %}{%- endif %}
+{%-   if c.get('command') %}{%- do cpairs.append(['Exec', c.command | string]) %}{%- endif %}
+{%-   if c.get('user') is not none %}{%- do cpairs.append(['User', c.user | string]) %}{%- endif %}
+{%-   if c.get('group') is not none %}{%- do cpairs.append(['Group', c.group | string]) %}{%- endif %}
+{%-   if c.get('auto_update') %}{%- do cpairs.append(['AutoUpdate', c.auto_update | string]) %}{%- endif %}
+
+{#-   --- assemble sections: Unit, Container, raw sections..., Install last #}
+{%-   set sections = {'Unit': [], 'Container': cpairs} %}
+{%-   if 'Description' not in (c.get('Unit') or {}) %}
+{%-     do sections.Unit.append(['Description', (c.get('description') or ('Podman container ' ~ name)) | string]) %}
+{%-   endif %}
+{%-   do merge_sections(sections, c) %}
+{%-   set install = sections.pop('Install', none) %}
+{%-   if install and c.get('enabled', true) %}{%- do sections.update({'Install': install}) %}{%- endif %}
+
+{%-   set image = (c.get('image') or '') | string %}
+{%-   set container = {
+        'name': name,
+        'file': config_dir ~ '/' ~ name ~ '.container',
+        'service': ((c.get('Container') or {}).get('ServiceName') or name) ~ '.service',
+        'image': image,
+        'pull': quadlet.pull_images and c.get('pull', true) and image and not (image.endswith('.image') or image.endswith('.build')),
+        'running': c.get('running', true),
+        'sections': sections.items() | list,
+        'named_volumes': named_volumes,
+        'bind_dirs': bind_dirs,
+        'purge_volumes': c.get('purge_volumes', false),
+      } %}
+{%-   if is_absent %}
+{%-     do q_absent.append(container) %}
+{%-   else %}
+{%-     do q_containers.append(container) %}
+{%-     do q_expected.append(name ~ '.container') %}
+{%-     for nv in named_volumes %}{%- do q_expected.append(nv.unit ~ '.volume') %}{%- endfor %}
+{%-   endif %}
+{%- endfor %}
+
+{%- if errors %}
+{{-   raise('Invalid quadlet pillar:\n  - ' ~ errors | join('\n  - ')) }}
+{%- endif %}
