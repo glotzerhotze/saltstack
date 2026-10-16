@@ -14,6 +14,7 @@ container, running under Podman on `192.168.23.64` as the systemd unit
 | `salt/`     | `salt-master-srv/_data/salt`                          | `/home/salt/data/srv/salt`      | State tree (`file_roots` base) |
 | `pillar/`   | `salt-master-srv/_data/pillar`                        | `/home/salt/data/srv/pillar`    | Pillar tree (`pillar_roots` base) |
 | `reactor/`  | `salt-master-srv/_data/reactor`                       | `/home/salt/data/srv/reactor`   | Reactor SLS, referenced by absolute path |
+| `modules/`  | `salt-master-srv/_data/modules`                       | `/home/salt/data/srv/modules`   | Master-side custom modules (`module_dirs`) |
 | `config/*`  | `salt-master-config/_data`                            | `/home/salt/data/config`        | Master `*.conf` drop-ins, auto-included |
 | `3pfs/*`    | `salt-master-3pfs/_data`                              | `/home/salt/data/3pfs`          | Third-party formulas, git submodules |
 
@@ -59,16 +60,33 @@ Container conventions to follow:
 - `reactor/local_grains.sls`: wired up in `config/10-reactor.conf`. It runs
   `state.apply local_grains` on a minion at `salt/minion/*/start` and on the
   custom event `custom/grains/sync`.
+- `modules/modules/`: custom execution modules that run on the **master**.
+  `config/50-modules.conf` points `module_dirs` at `/home/salt/data/srv/modules`,
+  and Salt looks for a `modules/` subdirectory inside it, which is why the
+  path is doubled. Currently this holds `onepassword.py` (see Secrets).
+  Changes take effect after a master restart. These modules are not synced
+  to minions; minion-side modules would go in `salt/_modules/`.
+- `config/`: master drop-ins.
+  - `10-reactor.conf`: reactor wiring.
+  - `20-salt-api.conf`: PAM `external_auth` for `salt_api`, and
+    `netapi_enable_clients`.
+  - `30-gitfs.conf`: gitfs, currently disabled.
+  - `40-onepassword.conf`: settings for the `onepassword` module.
+  - `50-modules.conf`: `module_dirs`.
+  - `onepassword.token`: the 1Password service account token. It is
+    gitignored, but **it is deployed** with `config/*`.
 - `3pfs/`: upstream `saltstack-formulas` repos as git submodules. **Do not
   edit them.** Adjust behaviour through pillar, or add a wrapper state under
   `salt/`. `3pfs/salt-bootstrap` is excluded from deploy.
-- `scripts/deploy.sh`: rsyncs everything above to the master and restarts it.
+- `scripts/deploy.sh`: rsyncs everything above to the master with
+  `--delete`, then restarts it. The local tree is the source of truth: a file
+  deleted here also disappears on the master.
 
 ## Conventions
 
 - Formulas follow the saltstack-formulas layout: `init.sls`, a `map.jinja`
   that merges `defaults.yaml` with pillar (`pillar.get(..., merge=True)`),
-  plus `pillar.example`, `files/` and `README.md`.
+  plus `pillar.example.sls`, `files/` and `README.md`.
 - Validate pillar input in Jinja and fail loudly with
   `{{ raise('<formula>: …') }}`. Don't silently skip bad data.
 - Use `tpldir` for paths that refer back to the formula itself, so it can be
@@ -85,10 +103,43 @@ Container conventions to follow:
 
 ## Secrets
 
-`pillar/` holds real secrets: password hashes in `pillar/users/` and Wi-Fi
-PSKs in `pillar/nm_connections/`. Do not print, log, copy or "example-ify"
-their values. Don't add new plaintext secrets. Suggest GPG-encrypted pillar
-(the container supports `keys/gpgkeys/`) or a restricted pillar instead.
+Secrets come from **1Password** and are read on the master while pillar is
+rendered. They are never written into this repo:
+
+```jinja
+wifi-security.psk: {{ salt['onepassword.read']('op://infra/<item>/<field>') | yaml_dquote }}   # keep quoted
+```
+
+- Always pipe the value through `yaml_dquote`. Otherwise a value containing
+  `: `, ` #`, `yes` or leading zeros breaks the YAML or changes its type.
+- Also available: `onepassword.get(vault, item, field='password',
+  section=None)` and `onepassword.item(vault, item)`. The full docs are in
+  the module docstring.
+- Only the master needs the `op` CLI (`/usr/bin/op` inside the container)
+  and the token. Minions only receive the resolved values in their own
+  pillar. Never call `onepassword.*` from states under `salt/`.
+- The service account is rate limited, and pillar renders for every minion
+  on every refresh. References by ID (`op://<vault-id>/<item-id>/...`) cost
+  1 read; references by name cost 3. The module caches values for
+  `cache_ttl` (300 s), so a rotated secret reaches minions within 5 minutes,
+  or right away after a master restart.
+- States that write secrets to files set `show_changes: False`, as
+  `nm_connections` does, so values don't leak into diffs and job returns. Do
+  the same in any new state that handles secrets.
+
+Rules:
+
+- Never write a secret value into a file in this repo, and never print one.
+  When a profile or config needs one, add a 1Password reference. If you
+  don't know the `op://` path, ask the user instead of leaving the field
+  empty: an empty PSK would wipe the working key on the host.
+- `pillar/users/` still has a password hash in plaintext. Don't copy it or
+  print it.
+- Never read, print or modify `config/onepassword.token`.
+- To check a secret on the master, prefer `salt-run salt.cmd
+  onepassword.version` or `onepassword.ratelimit`. Only use
+  `salt-run salt.cmd onepassword.read` when the user asks, because it prints
+  the secret.
 
 ## Validating changes
 
@@ -106,6 +157,10 @@ There is no local Salt or CI. Before suggesting a deploy:
    ```
 
    (The container name may differ. Check with `podman ps`.)
+
+   After changing `modules/` or `config/40-onepassword.conf`, check that the
+   module loads and can authenticate before rendering any pillar:
+   `podman exec -it salt-master salt-run salt.cmd onepassword.version`.
 3. For `nm_connections` changes, use `test=True` and leave `activate` off on
    the interface the minion uses to reach the master.
 
@@ -118,3 +173,5 @@ There is no local Salt or CI. Before suggesting a deploy:
 - Hard-code host paths or minion IDs in states. Per-host data belongs in
   `pillar/<formula>/<host>.sls`.
 - Commit `.DS_Store` or `.idea/`.
+- `git add` anything under `pillar/` (it is gitignored on purpose; it is
+  deployed from the working tree only) or `config/onepassword.token`.

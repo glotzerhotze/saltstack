@@ -125,6 +125,7 @@
     - user: root
     - group: root
     - mode: '0600'
+    - show_changes: False
     - makedirs: True
     - context:
         sections: {{ ordered | tojson }}

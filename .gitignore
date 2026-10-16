@@ -1,3 +1,4 @@
-pillar/
+config/onepassword.token
+pillar/*
 .DS_Store
 .idea/

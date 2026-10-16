@@ -35,7 +35,7 @@ Enable it, fill the form, save, apply highstate (or `nm_connections` alone).
 ### Plain Salt
 
 Put `states/nm_connections` into a file root, write pillar like
-`pillar.example`, and target `nm_connections` from `top.sls`.
+`pillar.example.sls`, and target `nm_connections` from `top.sls`.
 
 ## Pillar
 
