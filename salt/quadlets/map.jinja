@@ -27,7 +27,7 @@
 {%- set name_re = '^[A-Za-z0-9][A-Za-z0-9_.-]*$' %}
 {%- set unit_re = '.*\\.(container|volume|network|pod)$' %}
 {%- set errors = [] %}
-{%- set seen = {'ip': {}, 'ip6': {}, 'mac': {}, 'service': {}} %}
+{%- set seen = {'ip': {}, 'ip6': {}, 'mac': {}, 'service': {}, 'secret': {}} %}
 
 {#- Append `Key=value` pairs from a mapping; list values repeat the key. #}
 {%- macro add_pairs(pairs, data) %}
@@ -110,7 +110,7 @@
 {#- --------------------------------------------------------------------- apps #}
 {%- set app_keys = [
       'description', 'pod', 'hostname', 'ip', 'ip6', 'mac', 'dns',
-      'volumes', 'containers', 'running', 'enabled',
+      'volumes', 'secrets', 'containers', 'running', 'enabled',
       'absent', 'purge_volumes',
     ] %}
 {%- set container_keys = [
@@ -283,6 +283,33 @@
         }}) %}
 {%-   endfor %}
 
+{#-   --- podman secrets (global names); values never go into an error message #}
+{%-   set secrets = [] %}
+{%-   set sdefs = a.get('secrets') or {} %}
+{%-   if sdefs is not mapping %}
+{%-     do errors.append(where ~ ': secrets must be a mapping of podman secret name to value') %}
+{%-     set sdefs = {} %}
+{%-   endif %}
+{%-   for skey, sval in sdefs.items() %}
+{%-     set sname = skey | string %}
+{%-     set swhere = where ~ ':secrets:' ~ sname %}
+{%-     if sname | regex_match(name_re) is none %}
+{%-       do errors.append(swhere ~ ': secret name is invalid') %}
+{%-     endif %}
+{%-     if not is_absent %}
+{%-       if not (sval is string or sval is number) or sval is sameas true or sval is sameas false %}
+{%-         do errors.append(swhere ~ ': value must be a string') %}
+{%-       elif sval | string == '' %}
+{%-         do errors.append(swhere ~ ': value is empty; refusing to replace the secret with an empty one') %}
+{%-       endif %}
+{%-       if sname in seen.secret %}
+{%-         do errors.append(swhere ~ ': secret ' ~ sname ~ ' is already defined by ' ~ seen.secret[sname]) %}
+{%-       endif %}
+{%-       do seen.secret.update({sname: where}) %}
+{%-     endif %}
+{%-     do secrets.append({'name': sname, 'value': sval | string if sval is not none else none}) %}
+{%-   endfor %}
+
 {#-   --- pod #}
 {%-   set pod = none %}
 {%-   if use_pod %}
@@ -406,6 +433,14 @@
 {%-       endif %}
 {%-     endfor %}
 
+{#-     --- app secrets this container references through Container:Secret #}
+{%-     set suses = [] %}
+{%-     set raw_secrets = (c.get('Container') or {}).get('Secret') %}
+{%-     for s in ([raw_secrets] if raw_secrets is string else (raw_secrets or [])) %}
+{%-       set sref = (s | string).split(',')[0] %}
+{%-       for sec in secrets if sec.name == sref and sec not in suses %}{%- do suses.append(sec) %}{%- endfor %}
+{%-     endfor %}
+
 {%-     if c.get('entrypoint') %}{%- do cpairs.append(['Entrypoint', c.entrypoint | string]) %}{%- endif %}
 {%-     if c.get('command') %}{%- do cpairs.append(['Exec', c.command | string]) %}{%- endif %}
 {%-     if c.get('user') is not none %}{%- do cpairs.append(['User', c.user | string]) %}{%- endif %}
@@ -433,6 +468,7 @@
           'pull': quadlet.pull_images and c.get('pull', true) and image and not (image.endswith('.image') or image.endswith('.build')),
           'sections': sections.items() | list,
           'volumes': uses,
+          'secrets': suses,
           'bind_dirs': bind_dirs,
         } %}
 {%-     if not is_absent %}{%- do claim_service(container.service, cwhere) %}{%- endif %}
@@ -445,6 +481,7 @@
         'pod': pod,
         'containers': containers,
         'volumes': vols.values() | list,
+        'secrets': secrets,
         'running': a.get('running', true),
         'purge_volumes': a.get('purge_volumes', false),
       } %}

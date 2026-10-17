@@ -81,15 +81,20 @@ quadlets:
         data: {}
         db:
           volume_name: nextcloud-db-legacy   # adopt an existing podman volume
+      # podman secrets (global names); the value is never written to a unit
+      secrets:
+        nextcloud-db-pass: {{ salt['onepassword.read']('op://infra/nextcloud/db-password') | yaml_dquote }}
       containers:
         app:
           image: docker.io/library/nextcloud:31
           environment:
             MYSQL_HOST: 127.0.0.1           # containers in a pod share localhost
-            MYSQL_PASSWORD: 'change$me%now' # $ and % stay literal
+            MYSQL_USER: 'nc$user%1'         # $ and % stay literal
           volumes:
             - volume: data
               target: /var/www/html
+          Container:
+            Secret: nextcloud-db-pass,type=env,target=MYSQL_PASSWORD
         db:
           image: docker.io/library/mariadb:11
           volumes:
@@ -98,6 +103,7 @@ quadlets:
           # Raw sections: any capitalized key is written as-is into that section
           Container:
             AddCapability: [SYS_NICE]
+            Secret: nextcloud-db-pass,type=env,target=MARIADB_PASSWORD
           Unit:
             Description: Nextcloud database
       # Raw sections on the app go into the .pod unit

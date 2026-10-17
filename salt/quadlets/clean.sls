@@ -83,14 +83,28 @@ quadlet-orphan-dir-{{ d }}:
 {%-   endfor %}
 {%- endfor %}
 
-{#- Data of named volumes is kept unless the app says purge_volumes. #}
+{#- Secrets of an absent app are removed. Data of named volumes is kept
+    unless the app says purge_volumes. #}
 {%- if quadlet.manage_services %}
-{%-   for app in q_absent if app.purge_volumes %}
+{%-   for app in q_absent %}
 {%-     set stops = [] %}
 {%-     for o in orphans if o.kind in ['container', 'pod'] and o.rel.startswith(app.name ~ '/') %}
 {%-       do stops.append(o) %}
 {%-     endfor %}
-{%-     for v in app.volumes %}
+{%-     for s in app.secrets %}
+
+quadlet-absent-{{ app.name }}-secret-{{ s.name }}:
+  cmd.run:
+    - name: podman secret rm {{ s.name }}
+    - onlyif: podman secret exists {{ s.name }}
+{%-       if stops %}
+    - require:
+{%-         for o in stops %}
+      - service: quadlet-orphan-{{ o.rel }}-stop
+{%-         endfor %}
+{%-       endif %}
+{%-     endfor %}
+{%-     for v in (app.volumes if app.purge_volumes else []) %}
 
 quadlet-absent-{{ app.name }}-purge-{{ v.volume_name }}:
   cmd.run:

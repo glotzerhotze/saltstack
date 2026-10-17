@@ -87,9 +87,10 @@ The network is shared by all apps, so its unit stays directly in `/etc/container
 | `dns`           |           | String or list                                                              |
 | `description`   |           | `[Unit] Description=` of the pod, or of the single container               |
 | `volumes`       | `{}`      | Named podman volumes of this app, see below                                 |
+| `secrets`       | `{}`      | Podman secrets of this app, name → value, see below                         |
 | `running`       | `true`    | `false` keeps the units but stops the services                              |
 | `enabled`       | `true`    | `false` drops `[Install]`, so nothing starts at boot                        |
-| `absent`        | `false`   | Stop the services and delete the app's units and directory                  |
+| `absent`        | `false`   | Stop the services and delete the app's units, directory and secrets         |
 | `purge_volumes` | `false`   | With `absent`, also `podman volume rm` its named volumes                     |
 | `Pod`, `Unit`, `Service`, `Install` | | Raw sections of the `.pod` unit (pods only)                |
 
@@ -171,7 +172,30 @@ volumes:
   - other-app-data.volume:/shared   # share another app's named volume
 ```
 
+### Secrets
+
+Values come from pillar (in this repo: 1Password via `onepassword.read`) and become podman secrets on the host. Containers use them with the regular `Secret=` key, so the value never ends up in a unit file:
+
+```yaml
+apps:
+  pihole:
+    secrets:
+      pihole: {{ salt['onepassword.read']('op://infra/pihole/password') | yaml_dquote }}
+    containers:
+      pihole:
+        Container:
+          Secret: pihole,type=env,target=FTLCONF_webserver_api_password
+```
+
+- The name is the podman secret name, which is global on the host, so it must be unique across apps.
+- The value is passed on stdin (`podman secret create --replace <name> -`) and compared via an environment variable. It is never on a command line, and the command output is hidden.
+- The secret is only replaced when the stored value differs. Containers that reference it via `Container:Secret` are then restarted.
+- Empty or non-string values are rejected, so a failed lookup never replaces a working secret with an empty one.
+- Secrets are created only with `manage_services: true`. Removing an app (`absent: true`) removes its secrets. A secret that is only dropped from pillar stays on the host.
+
 ## Behaviour
+
+- **No pillar, no action.** A minion without any `quadlets` pillar gets a single no-op state, so the formula can be targeted at `'*'`. An empty `quadlets` mapping with `apps: {}` still runs the clean-up.
 
 - **Validation.** A broken pillar aborts rendering with a list of every problem, before anything is changed. It checks for: missing image, unknown option (typo), app settings on a container and vice versa, IP outside the subnet or equal to the gateway, duplicate IP/MAC across apps, malformed or multicast MAC, unquoted MAC, mounts of undefined volumes, volumes without target or with relative paths, pod-owned keys on pod containers, clashing unit names, and a hand-written unit with the same file name elsewhere under `/etc/containers/systemd` (Quadlet unit names are global across subdirectories).
 - **Changes** to a `.container` or `.volume` unit trigger one `daemon-reload` and a restart of the containers using it. A changed `.pod` restarts the pod and its containers.

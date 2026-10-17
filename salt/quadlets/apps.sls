@@ -40,6 +40,28 @@ include:
 {%-     endif %}
 {%-   endfor %}
 
+{#-   The value only travels via stdin and the environment, never on the
+      command line, and nothing it prints is returned. It is replaced only
+      when the stored value differs. #}
+{%-   if quadlet.manage_services %}
+{%-     for s in app.secrets %}
+
+{{ prefix }}-secret-{{ s.name }}:
+  cmd.run:
+    - name: podman secret create --replace --label app={{ app.name }} --label managed-by=salt-quadlets {{ s.name }} -
+    - stdin: {{ s.value | yaml_dquote }}
+    - env:
+      - QUADLET_SECRET: {{ s.value | yaml_dquote }}
+    - unless: '[ "$(podman secret inspect --showsecret --format "{{ '{{.SecretData}}' }}" {{ s.name }} 2>/dev/null)" = "$QUADLET_SECRET" ]'
+    - hide_output: True
+    - output_loglevel: quiet
+{%-       if quadlet.manage_package %}
+    - require:
+      - pkg: quadlet-package-installed
+{%-       endif %}
+{%-     endfor %}
+{%-   endif %}
+
 {%-   if app.pod %}
 
 {{ prefix }}-pod:
@@ -172,6 +194,9 @@ include:
 {%-         endif %}
 {%-         for v in c.volumes %}
       - file: {{ prefix }}-volume-{{ v.name }}
+{%-         endfor %}
+{%-         for s in c.secrets %}
+      - cmd: {{ prefix }}-secret-{{ s.name }}
 {%-         endfor %}
 {%-       endif %}
 {%-     endfor %}
