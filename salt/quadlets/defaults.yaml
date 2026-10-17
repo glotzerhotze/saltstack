@@ -2,7 +2,7 @@
 # vim: ft=yaml
 #
 # Default settings for the quadlet formula. Everything here can be
-# overridden in pillar under the `quadlet` key.
+# overridden in pillar under the `quadlets` key.
 ---
 quadlet:
   # Install podman with pkg.installed

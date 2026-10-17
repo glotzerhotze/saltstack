@@ -4,7 +4,7 @@
 # Example pillar for the quadlet formula. Only `network.parent`,
 # `network.subnet` and `containers.<name>.image` are required.
 ---
-quadlet:
+quadlets:
   # manage_package: true
   # manage_services: true
   # config_dir: /etc/containers/systemd

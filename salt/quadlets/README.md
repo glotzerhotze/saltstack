@@ -16,24 +16,24 @@ Tested with Salt 3007.15 and Podman 4.9.3 (Ubuntu 24.04). The generated units we
 # top.sls
 base:
   'container-host*':
-    - quadlet
+    - quadlets
 ```
 
-| State                | Does                                                                   |
-| -------------------- | ---------------------------------------------------------------------- |
-| `quadlet`            | Everything below. Use this one.                                         |
-| `quadlet.package`    | Installs podman                                                         |
-| `quadlet.config`     | Quadlet directory, `systemctl daemon-reload` when any unit changed     |
-| `quadlet.network`    | The macvlan `.network` unit and its service                            |
-| `quadlet.containers` | `.container` + `.volume` units, bind dirs, image pulls, services       |
-| `quadlet.clean`      | Stops and removes quadlets that left the pillar or are `absent: true`  |
+| State                 | Does                                                                   |
+| --------------------- | ---------------------------------------------------------------------- |
+| `quadlets`            | Everything below. Use this one.                                        |
+| `quadlets.package`    | Installs podman                                                        |
+| `quadlets.config`     | Quadlet directory, `systemctl daemon-reload` when any unit changed     |
+| `quadlets.network`    | The macvlan `.network` unit and its service                            |
+| `quadlets.containers` | `.container` + `.volume` units, bind dirs, image pulls, services       |
+| `quadlets.clean`      | Stops and removes quadlets that left the pillar or are `absent: true`  |
 
 ## Pillar
 
 See `pillar.example.sls` for a complete, commented example. Minimal:
 
 ```yaml
-quadlet:
+quadlets:
   network:
     name: lan
     parent: eth0
@@ -54,10 +54,10 @@ quadlet:
 
 This writes `lan.network`, `web.container` and `web-html.volume`, and runs `web.service` with container name `web` at 192.168.10.50 / 02:42:c0:a8:0a:32.
 
-### `quadlet:network`
+### `quadlets:network`
 
 | Key                  | Default   | Meaning                                                                 |
-| -------------------- | --------- | ----------------------------------------------------------------------- |
+| --------------------- | --------- | ----------------------------------------------------------------------- |
 | `name`               | `macvlan` | Unit file `<name>.network`, podman network `<name>`, service `<name>-network.service` |
 | `parent`             | required  | Host interface (`eth0`, `bond0.20`, …)                                  |
 | `subnet`             | required  | CIDR, string or list (add an IPv6 subnet + `ipv6: true` for dual stack) |
@@ -69,7 +69,7 @@ This writes `lan.network`, `web.container` and `web-html.volume`, and runs `web.
 | `recreate_on_change` | `true`    | See *Network changes* below                                             |
 | `Network`, `Unit`, … |           | Raw unit sections                                                       |
 
-### `quadlet:containers:<name>`
+### `quadlets:containers:<name>`
 
 | Key                 | Default        | Meaning                                                             |
 | ------------------- | -------------- | ------------------------------------------------------------------- |
@@ -93,7 +93,7 @@ This writes `lan.network`, `web.container` and `web-html.volume`, and runs `web.
 | `purge_volumes`     | `false`        | With `absent`, also `podman volume rm` its named volumes            |
 | `Container`, `Unit`, `Service`, `Install`, `Quadlet` | | Raw unit sections, written as-is      |
 
-`quadlet:container_defaults` is merged into every container. By default it sets `Restart=always`, `TimeoutStartSec=900` and `WantedBy=multi-user.target`.
+`quadlets:container_defaults` is merged into every container. By default it sets `Restart=always`, `TimeoutStartSec=900` and `WantedBy=multi-user.target`.
 
 **Raw sections.** Any capitalized key is a unit section and its keys go into the file unchanged. A list value repeats the key:
 

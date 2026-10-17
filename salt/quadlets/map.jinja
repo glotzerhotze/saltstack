@@ -15,7 +15,7 @@
   broken pillar never gets half-applied.
 #}
 {%- import_yaml tpldir ~ '/defaults.yaml' as defaults %}
-{%- set quadlet = salt['slsutil.merge'](defaults.quadlet, salt['pillar.get']('quadlet', {}), merge_lists=False) %}
+{%- set quadlet = salt['slsutil.merge'](defaults.quadlet, salt['pillar.get']('quadlets', {}), merge_lists=False) %}
 {%- set q_marker = '# Managed by Salt (quadlet formula) - local changes will be overwritten' %}
 {%- set config_dir = quadlet.config_dir | string %}
 {%- set errors = [] %}
@@ -309,5 +309,5 @@
 {%- endfor %}
 
 {%- if errors %}
-{{-   raise('Invalid quadlet pillar:\n  - ' ~ errors | join('\n  - ')) }}
+{{-   raise('Invalid quadlets pillar:\n  - ' ~ errors | join('\n  - ')) }}
 {%- endif %}

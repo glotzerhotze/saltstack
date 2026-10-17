@@ -13,3 +13,8 @@ base:
     - packages.backports_kernel
 {%- endif %}
     - nm_connections
+
+  # Podman quadlets (pillar: quadlets.<short_name>)
+  'rpi-03 or rpi-03.*':
+    - match: compound
+    - quadlets
