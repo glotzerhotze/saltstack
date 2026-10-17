@@ -4,7 +4,7 @@
 # Default settings for the quadlet formula. Everything here can be
 # overridden in pillar under the `quadlets` key.
 ---
-quadlet:
+quadlets:
   # Install podman with pkg.installed
   manage_package: true
   pkg: podman
@@ -13,7 +13,9 @@ quadlet:
   # pulls, no service start/stop, no network re-creation.
   manage_services: true
 
-  # Rootful quadlet search path (macvlan with static IP/MAC needs rootful)
+  # Rootful quadlet search path (macvlan with static IP/MAC needs rootful).
+  # Every app gets its own subdirectory <config_dir>/<app>/; the shared
+  # network unit stays in config_dir itself.
   config_dir: /etc/containers/systemd
 
   # Pull images during the Salt run (before the service is (re)started), so
@@ -40,12 +42,15 @@ quadlet:
 
   # Merged into every container (container settings win)
   container_defaults:
-    running: true            # service.running (false -> service.dead)
-    enabled: true            # render [Install] so the unit starts at boot
     Service:
       Restart: always
       TimeoutStartSec: 900
     Install:
       WantedBy: multi-user.target
 
-  containers: {}
+  # Merged into the raw sections of every pod (app settings win)
+  pod_defaults:
+    Install:
+      WantedBy: multi-user.target
+
+  apps: {}
