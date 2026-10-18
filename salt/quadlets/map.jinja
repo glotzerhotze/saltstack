@@ -12,6 +12,8 @@
     q_expected    paths (relative to config_dir) of all unit files this
                   formula currently owns
     q_app_dirs    names of the per-app subdirectories that should exist
+    q_expected_units  names of the plain systemd units (in systemd_dir) this
+                  formula currently owns
 
   An app is one quadlet: a subdirectory <config_dir>/<app>/ holding its
   .container units, its .volume units and, with more than one container, a
@@ -24,6 +26,7 @@
 {%- set quadlet = salt['slsutil.merge'](defaults.quadlets, salt['pillar.get']('quadlets', {}), merge_lists=False) %}
 {%- set q_marker = '# Managed by Salt (quadlet formula) - local changes will be overwritten' %}
 {%- set config_dir = quadlet.config_dir | string %}
+{%- set systemd_dir = quadlet.systemd_dir | string %}
 {%- set name_re = '^[A-Za-z0-9][A-Za-z0-9_.-]*$' %}
 {%- set unit_re = '.*\\.(container|volume|network|pod)$' %}
 {%- set errors = [] %}
@@ -105,12 +108,13 @@
     } %}
 {%- set q_expected = [net_name ~ '.network'] %}
 {%- set q_app_dirs = [] %}
+{%- set q_expected_units = [] %}
 {%- do seen.service.update({q_network.service: 'network'}) %}
 
 {#- --------------------------------------------------------------------- apps #}
 {%- set app_keys = [
       'description', 'pod', 'hostname', 'ip', 'ip6', 'mac', 'dns',
-      'volumes', 'secrets', 'containers', 'running', 'enabled',
+      'volumes', 'secrets', 'units', 'containers', 'running', 'enabled',
       'absent', 'purge_volumes',
     ] %}
 {%- set container_keys = [
@@ -310,6 +314,45 @@
 {%-     do secrets.append({'name': sname, 'value': sval | string if sval is not none else none}) %}
 {%-   endfor %}
 
+{#-   --- plain systemd units (.service/.timer) that belong to the app #}
+{%-   set units = [] %}
+{%-   set udefs = a.get('units') or {} %}
+{%-   if udefs is not mapping %}
+{%-     do errors.append(where ~ ': units must be a mapping of unit file name to sections') %}
+{%-     set udefs = {} %}
+{%-   endif %}
+{%-   for ukey, uraw in udefs.items() %}
+{%-     set uname = ukey | string %}
+{%-     set u = uraw or {} %}
+{%-     set uwhere = where ~ ':units:' ~ uname %}
+{%-     set upath = systemd_dir ~ '/' ~ uname %}
+{%-     if uname | regex_match('^[A-Za-z0-9][A-Za-z0-9_.@-]*\\.(service|timer)$') is none %}
+{%-       do errors.append(uwhere ~ ': unit name must end in .service or .timer') %}
+{%-     endif %}
+{%-     if u is not mapping %}
+{%-       do errors.append(uwhere ~ ': must be a mapping of sections (Unit:, Service:, Timer:, Install:)') %}
+{%-       set u = {} %}
+{%-     endif %}
+{%-     for key in u if not (key | string)[:1].isupper() %}
+{%-       do errors.append(uwhere ~ ': unknown option "' ~ key ~ '" (only raw sections like Unit:/Service:/Timer:/Install: are allowed)') %}
+{%-     endfor %}
+{%-     if not is_absent %}
+{%-       do claim_service(uname, uwhere) %}
+{%-       if salt['file.file_exists'](upath) and not salt['file.search'](upath, '^' ~ q_marker | regex_escape) %}
+{%-         do errors.append(uwhere ~ ': a hand-written ' ~ upath ~ ' already exists; remove it first') %}
+{%-       endif %}
+{%-     endif %}
+{%-     set usections = {} %}
+{%-     do merge_sections(usections, u) %}
+{%-     do units.append({
+          'name': uname,
+          'kind': uname.rsplit('.', 1)[-1],
+          'file': upath,
+          'has_install': 'Install' in usections,
+          'sections': usections.items() | list,
+        }) %}
+{%-   endfor %}
+
 {#-   --- pod #}
 {%-   set pod = none %}
 {%-   if use_pod %}
@@ -482,7 +525,9 @@
         'containers': containers,
         'volumes': vols.values() | list,
         'secrets': secrets,
+        'units': units,
         'running': a.get('running', true),
+        'enabled': a.get('enabled', true),
         'purge_volumes': a.get('purge_volumes', false),
       } %}
 {%-   if is_absent %}
@@ -492,6 +537,7 @@
 {%-     do q_app_dirs.append(app_name) %}
 {%-     if pod %}{%- do q_expected.append(pod.rel) %}{%- endif %}
 {%-     for x in containers + app.volumes %}{%- do q_expected.append(x.rel) %}{%- endfor %}
+{%-     for u in units %}{%- do q_expected_units.append(u.name) %}{%- endfor %}
 {%-   endif %}
 {%- endfor %}
 

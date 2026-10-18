@@ -8,8 +8,9 @@
 # disappear, and all of this happens before new containers start, so a
 # re-used IP or MAC is free. An app subdirectory is removed once it held
 # nothing but such orphans.
-{%- from tpldir ~ '/map.jinja' import quadlet, q_marker, q_absent, q_expected, q_app_dirs with context %}
+{%- from tpldir ~ '/map.jinja' import quadlet, q_marker, q_absent, q_expected, q_app_dirs, q_expected_units with context %}
 {%- set config_dir = quadlet.config_dir | string %}
+{%- set systemd_dir = quadlet.systemd_dir | string %}
 
 include:
   - .config
@@ -69,6 +70,37 @@ quadlet-orphan-{{ o.rel }}-remove:
     - require:
       - service: quadlet-orphan-{{ o.rel }}-stop
 {%-     endif %}
+{%-   endif %}
+{%- endfor %}
+
+{#- plain systemd units of apps (apps:<app>:units) that left the pillar #}
+{%- set unit_orphans = [] %}
+{%- if salt['file.directory_exists'](systemd_dir) %}
+{%-   for path in salt['file.find'](systemd_dir, type='f', maxdepth=1, regex='.*\\.(service|timer)$') | sort %}
+{%-     set uname = salt['file.basename'](path) %}
+{%-     if uname not in q_expected_units and salt['file.search'](path, '^' ~ q_marker | regex_escape) %}
+{%-       do unit_orphans.append({'name': uname, 'path': path}) %}
+{%-     endif %}
+{%-   endfor %}
+{%- endif %}
+
+{%- for u in unit_orphans %}
+{%-   if quadlet.manage_services %}
+
+quadlet-orphan-unit-{{ u.name }}-stop:
+  service.dead:
+    - name: {{ u.name }}
+    - enable: False
+    - require_in:
+      - file: quadlet-orphan-unit-{{ u.name }}
+{%-   endif %}
+
+quadlet-orphan-unit-{{ u.name }}:
+  file.absent:
+    - name: {{ u.path }}
+{%-   if quadlet.manage_services %}
+    - onchanges_in:
+      - cmd: quadlet-daemon-reload
 {%-   endif %}
 {%- endfor %}
 

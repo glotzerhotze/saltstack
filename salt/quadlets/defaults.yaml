@@ -18,6 +18,9 @@ quadlets:
   # network unit stays in config_dir itself.
   config_dir: /etc/containers/systemd
 
+  # Where the plain systemd units of apps (apps:<app>:units) go
+  systemd_dir: /etc/systemd/system
+
   # Pull images during the Salt run (before the service is (re)started), so
   # a slow pull never runs into the systemd start timeout and a bad image
   # name fails the highstate instead of a unit.

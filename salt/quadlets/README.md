@@ -88,9 +88,10 @@ The network is shared by all apps, so its unit stays directly in `/etc/container
 | `description`   |           | `[Unit] Description=` of the pod, or of the single container               |
 | `volumes`       | `{}`      | Named podman volumes of this app, see below                                 |
 | `secrets`       | `{}`      | Podman secrets of this app, name → value, see below                         |
+| `units`         | `{}`      | Plain systemd `.service`/`.timer` units of this app, see below              |
 | `running`       | `true`    | `false` keeps the units but stops the services                              |
 | `enabled`       | `true`    | `false` drops `[Install]`, so nothing starts at boot                        |
-| `absent`        | `false`   | Stop the services and delete the app's units, directory and secrets         |
+| `absent`        | `false`   | Stop the services and delete the app's units, directory, secrets and systemd units |
 | `purge_volumes` | `false`   | With `absent`, also `podman volume rm` its named volumes                     |
 | `Pod`, `Unit`, `Service`, `Install` | | Raw sections of the `.pod` unit (pods only)                |
 
@@ -192,6 +193,39 @@ apps:
 - The secret is only replaced when the stored value differs. Containers that reference it via `Container:Secret` are then restarted.
 - Empty or non-string values are rejected, so a failed lookup never replaces a working secret with an empty one.
 - Secrets are created only with `manage_services: true`. Removing an app (`absent: true`) removes its secrets. A secret that is only dropped from pillar stays on the host.
+
+### Systemd units
+
+Helper jobs that are not containers (downloads, backups, clean-ups) can be added as plain systemd units. Quadlet does not process `.service`/`.timer` files, so they are written to `systemd_dir` (`/etc/systemd/system`) with the formula's header line:
+
+```yaml
+apps:
+  unbound:
+    units:
+      unbound-root-hints.service:
+        Unit:
+          Requires: unbound-etc-volume.service
+          After: unbound-etc-volume.service
+        Service:
+          Type: oneshot
+          ExecStart: /usr/bin/curl --fail -o /var/lib/containers/storage/volumes/unbound-etc/_data/named.root https://www.internic.net/domain/named.root
+      unbound-root-hints.timer:
+        Timer:
+          OnCalendar: daily
+          Persistent: true
+        Install:
+          WantedBy: timers.target
+    containers:
+      unbound:
+        Unit:                       # also run it before every container start
+          Wants: unbound-root-hints.service
+          After: unbound-root-hints.service
+```
+
+- Keys are the unit file names and must end in `.service` or `.timer`. The values hold only raw sections. A list value repeats the key, as for multiple `ExecStart=` lines in a oneshot.
+- Timers follow the app: started with `running`, enabled with `enabled` (when they have `[Install]`). Services with `[Install]` are only enabled or disabled, never started, because a timer or a dependency starts them. Services without `[Install]` are just written.
+- A hand-written unit with the same name in `systemd_dir` aborts the render. Units dropped from pillar, or belonging to an absent app, are stopped, disabled and deleted. Only files with the header line are touched.
+- Unit names share the global namespace with the generated quadlet services, and clashes are rejected. A name that matches a distro unit (in `/usr/lib/systemd/system`) overrides it.
 
 ## Behaviour
 

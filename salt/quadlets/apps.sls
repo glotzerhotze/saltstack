@@ -138,7 +138,48 @@ include:
 {%-     endif %}
 {%-   endfor %}
 
+{%-   for u in app.units %}
+
+{{ prefix }}-unit-{{ u.name }}:
+  file.managed:
+    - name: {{ u.file }}
+    - source: salt://{{ tpldir }}/files/unit.jinja
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: '0644'
+    - context: {{ {'marker': q_marker, 'sections': u.sections} | json }}
+{%-     if quadlet.manage_services %}
+    - onchanges_in:
+      - cmd: quadlet-daemon-reload
+{%-     endif %}
+{%-   endfor %}
+
 {%-   if quadlet.manage_services %}
+{#-     Timers run with the app; other units with [Install] are only
+        enabled, since they are started by a timer or a dependency. #}
+{%-     for u in app.units if u.kind == 'timer' or u.has_install %}
+
+{{ prefix }}-unit-{{ u.name }}-service:
+{%-       if u.kind != 'timer' %}
+  service.{{ 'enabled' if app.enabled else 'disabled' }}:
+{%-       elif app.running %}
+  service.running:
+{%-       else %}
+  service.dead:
+{%-       endif %}
+    - name: {{ u.name }}
+{%-       if u.kind == 'timer' and u.has_install %}
+    - enable: {{ app.enabled }}
+{%-       endif %}
+    - require:
+      - cmd: quadlet-daemon-reload
+{%-       if u.kind == 'timer' and app.running %}
+    - watch:
+      - file: {{ prefix }}-unit-{{ u.name }}
+{%-       endif %}
+{%-     endfor %}
+
 {#-     Running: pod first, then its containers. Stopped: containers first. #}
 {%-     if app.pod %}
 
