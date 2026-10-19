@@ -14,3 +14,7 @@ base:
     - packages.backports_kernel
 {%- endif %}
     - nm_connections
+    - restic.client
+
+  'rpi-01':
+    - restic.server

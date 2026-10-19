@@ -1,0 +1,84 @@
+{#- -*- coding: utf-8 -*- #}
+{#- vim: ft=jinja #}
+{#-
+  Builds the `restic` settings dict:
+    defaults.yaml  <  OS family map  <  pillar `restic`
+  plus a few derived values (paths, download URL, repository).
+-#}
+{%- set tplroot = tpldir.split('/')[0] %}
+{%- import_yaml tplroot ~ '/defaults.yaml' as defaults %}
+
+{%- set osfamilymap = {
+    'Debian': {
+      'pkgs': {'setcap': 'libcap2-bin', 'bzip2': 'bzip2', 'cron': 'cron'},
+      'cron_service': 'cron',
+      'server': {'packages': ['fuse3']},
+    },
+    'RedHat': {
+      'pkgs': {'setcap': 'libcap', 'bzip2': 'bzip2', 'cron': 'cronie'},
+      'cron_service': 'crond',
+      'server': {'packages': ['fuse3']},
+    },
+    'Suse': {
+      'pkgs': {'setcap': 'libcap-progs', 'bzip2': 'bzip2', 'cron': 'cron'},
+      'cron_service': 'cron',
+      'server': {'packages': ['fuse3']},
+    },
+    'Arch': {
+      'pkgs': {'setcap': 'libcap', 'bzip2': 'bzip2', 'cron': 'cronie'},
+      'cron_service': 'cronie',
+      'server': {'packages': ['fuse3']},
+    },
+} %}
+
+{%- set restic = salt['slsutil.merge'](
+      defaults['restic'],
+      salt['grains.filter_by'](osfamilymap, grain='os_family', default='Debian')) %}
+{%- set restic = salt['slsutil.merge'](restic, salt['pillar.get']('restic', {})) %}
+
+{#- Release asset architecture names #}
+{%- set archmap = {
+    'x86_64': 'amd64', 'amd64': 'amd64',
+    'aarch64': 'arm64', 'arm64': 'arm64',
+    'armv6l': 'arm', 'armv7l': 'arm',
+    'i386': '386', 'i686': '386',
+    'ppc64le': 'ppc64le', 's390x': 's390x', 'riscv64': 'riscv64',
+} %}
+{%- set arch = archmap.get(grains['cpuarch'], grains['cpuarch']) %}
+
+{%- set home = restic.user.home %}
+{%- set asset = 'restic_' ~ restic.version ~ '_linux_' ~ arch ~ '.bz2' %}
+{%- set release_url = restic.install.base_url ~ '/v' ~ restic.version %}
+
+{%- if restic.install.source %}
+{%-   set source = restic.install.source %}
+{%-   set source_hash = restic.install.source_hash %}
+{%- else %}
+{%-   set source = release_url ~ '/' ~ asset %}
+{%-   set source_hash = restic.install.source_hash or release_url ~ '/SHA256SUMS' %}
+{%- endif %}
+
+{%- set sftp_path = restic.repo_base ~ '/' ~ grains['id'] %}
+{%- set repository = restic.client.repository
+      or 'sftp:' ~ restic.client.sftp.alias ~ ':' ~ sftp_path %}
+
+{%- do restic.update({
+    'arch': arch,
+    'bin_dir': home ~ '/bin',
+    'bin': home ~ '/bin/restic',
+    'wrapper': home ~ '/bin/restic-repo',
+    'backup_script': home ~ '/bin/run-backup',
+    'env_file': home ~ '/restic.env',
+    'password_file': home ~ '/.restic-password',
+    'files_from': home ~ '/files_to_backup',
+    'exclude_file': home ~ '/excludes',
+    'data_dir': home ~ '/data',
+    'archive': restic.install.tmp_dir ~ '/' ~ asset,
+    'source': source,
+    'source_hash': source_hash,
+    'repository': repository,
+    'uses_default_sftp': not restic.client.repository,
+    'sftp_path': sftp_path,
+    'identity_file': restic.client.sftp.identity_file or home ~ '/.ssh/id_ed25519',
+    'version_check': "'" ~ home ~ "/bin/restic' version 2>/dev/null | grep -qF 'restic " ~ restic.version ~ " '",
+}) %}

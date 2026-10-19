@@ -1,0 +1,12 @@
+# Managed by Salt (restic formula) - local changes will be overwritten.
+{%- set s = restic.client.schedule %}
+[Unit]
+Description=Run restic backup
+
+[Timer]
+OnCalendar={{ s.on_calendar }}
+RandomizedDelaySec={{ s.randomized_delay }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

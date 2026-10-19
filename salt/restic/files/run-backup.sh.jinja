@@ -1,0 +1,106 @@
+#!/bin/bash
+# Managed by Salt (restic formula) - local changes will be overwritten.
+#
+# Backup job for {{ grains['id'] }}, runs as {{ restic.user.name }}.
+# Exit code: 0 on success, otherwise the first failing restic exit code
+# (3 = snapshot created, but some files could not be read).
+{%- set c = restic.client %}
+set -uo pipefail
+umask 077
+
+# shellcheck source=/dev/null
+. {{ restic.env_file | quote }}
+
+RESTIC={{ restic.bin | quote }}
+HEARTBEAT_URL={{ c.heartbeat_url | quote }}
+HEARTBEAT_FAIL_SUFFIX={{ c.heartbeat_fail_suffix | quote }}
+MONITORING_CONF={{ (restic.user.home ~ '/monitoring-conf.json') | quote }}
+
+# Heartbeat registered by restic.monitoring, if no URL is set in pillar
+if [ -z "$HEARTBEAT_URL" ] && [ -r "$MONITORING_CONF" ] && command -v jq >/dev/null 2>&1; then
+    HEARTBEAT_URL=$(jq -r '.data.attributes.url // empty' "$MONITORING_CONF")
+fi
+
+heartbeat() {
+    [ -n "$HEARTBEAT_URL" ] || return 0
+    curl -fsS -m 10 --retry 3 -o /dev/null "$1" || echo "WARNING: heartbeat request failed" >&2
+}
+
+rc=0
+run() {
+    echo "==> restic $*"
+    "$RESTIC" "$@"
+    local r=$?
+    if [ "$r" -ne 0 ]; then
+        echo "restic $1 exited with code $r" >&2
+        [ "$rc" -ne 0 ] || rc=$r
+    fi
+    return "$r"
+}
+
+finish() {
+    if [ "$rc" -eq 0 ]; then
+        heartbeat "$HEARTBEAT_URL"
+    elif [ -n "$HEARTBEAT_FAIL_SUFFIX" ]; then
+        heartbeat "${HEARTBEAT_URL}${HEARTBEAT_FAIL_SUFFIX}"
+    fi
+    exit "$rc"
+}
+
+# Only one run at a time
+exec 9>{{ (restic.user.home ~ '/.run-backup.lock') | quote }}
+if ! flock -n 9; then
+    echo "Another backup run is still active, skipping." >&2
+    exit 0
+fi
+{%- if c.pre_backup %}
+
+# Pre-backup commands
+{%-   for cmd in c.pre_backup %}
+echo "==> pre_backup: "{{ cmd | quote }}
+if ! ( {{ cmd }} ); then
+    echo "pre_backup command failed, skipping the backup" >&2
+    rc=1
+    finish
+fi
+{%-   endfor %}
+{%- endif %}
+
+backup_args=(
+    --files-from {{ restic.files_from | quote }}
+    --exclude-file {{ restic.exclude_file | quote }}
+    --tag {{ c.tag | quote }}
+{%- for arg in c.backup_args %}
+    {{ arg | string | quote }}
+{%- endfor %}
+)
+run backup "${backup_args[@]}"
+backup_rc=$?
+
+# 3 = snapshot was created, but some files were unreadable: still clean up
+if [ "$backup_rc" -eq 0 ] || [ "$backup_rc" -eq 3 ]; then
+{%- if c.forget.enabled %}
+    forget_args=(
+        --tag {{ c.tag | quote }}
+        --group-by {{ c.forget.group_by | quote }}
+{%-   for key, value in c.forget.keep | dictsort %}
+        --keep-{{ key | replace('_', '-') }} {{ value | string | quote }}
+{%-   endfor %}
+{%-   if c.forget.prune %}
+        --prune
+{%-   endif %}
+    )
+    run forget "${forget_args[@]}"
+{%- endif %}
+{%- if c.check.enabled %}
+    check_args=(
+{%-   for arg in c.check.args %}
+        {{ arg | string | quote }}
+{%-   endfor %}
+    )
+    run check "${check_args[@]}"
+{%- endif %}
+    :
+fi
+
+finish

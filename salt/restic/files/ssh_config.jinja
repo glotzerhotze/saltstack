@@ -1,0 +1,20 @@
+# Managed by Salt (restic formula) - local changes will be overwritten.
+{%- set s = restic.client.sftp %}
+{%- set opts = {
+    'HostName': s.host,
+    'Port': s.port,
+    'User': s.user,
+    'IdentityFile': restic.identity_file,
+    'IdentitiesOnly': 'yes',
+    'BatchMode': 'yes',
+    'StrictHostKeyChecking': s.strict_host_key_checking,
+    'HashKnownHosts': 'no',
+    'ConnectTimeout': 30,
+    'ServerAliveInterval': 60,
+    'ServerAliveCountMax': 240,
+} %}
+{%- do opts.update(s.options) %}
+Host {{ s.alias }}
+{%- for key, value in opts.items() %}
+    {{ key }} {{ 'yes' if value is sameas true else ('no' if value is sameas false else value) }}
+{%- endfor %}
