@@ -13,7 +13,6 @@ base:
 {%- if 'raspberry pi' not in grains.get('productname', '') | lower %}
     - packages.backports_kernel
 {%- endif %}
-    - nm_connections
     - restic.client
 
   'rpi-01':
