@@ -1,0 +1,151 @@
+# -*- coding: utf-8 -*-
+# vim: ft=yaml
+#
+# Default settings for the restic formula.
+# Everything here can be overridden with the `restic` pillar key
+# (see pillar.example). OS-specific package names live in map.jinja.
+---
+restic:
+  # restic release to install from GitHub
+  version: '0.19.1'
+
+  user:
+    name: restic
+    group: restic
+    home: /var/lib/restic
+    shell: /bin/bash
+    # By default the account is created by the users formula (see
+    # pillar.example), so this formula does not fight over it.
+    # Set to true to let this formula create a minimal system account.
+    manage: false
+    # SLS that creates the account when `manage` is false. It is included
+    # and required, so restic states always run after it.
+    # Set to '' if the account is created some other way.
+    require_sls: users
+
+  install:
+    base_url: https://github.com/restic/restic/releases/download
+    # Override the download completely, e.g. to distribute the binary from
+    # the salt master: salt://restic/files/restic_0.19.1_linux_amd64.bz2
+    source: ''
+    # Empty = verify against the release's SHA256SUMS file.
+    # Required when `source` points to a non-salt:// URL.
+    source_hash: ''
+    # Where the .bz2 is downloaded to; it is removed after installation.
+    tmp_dir: /var/tmp
+
+  # Directory on the backup server that holds one repository per client:
+  # <repo_base>/<minion id>
+  repo_base: /var/lib/restic/repos
+
+  server:
+    # Extra packages on the backup server (fuse is needed for `restic mount`).
+    # Defaults per OS family come from map.jinja.
+    packages: []
+    # Public keys allowed to log in as the restic user. Only needed when
+    # `user:manage` is true; with the users formula use `users:restic:ssh_auth`.
+    authorized_keys: []
+
+  client:
+    sftp:
+      # SSH host alias used in the repository URL
+      alias: restic-server
+      # Backup server host name or IP (required for the default repository)
+      host: ''
+      port: 22
+      user: restic
+      # Empty = <home>/.ssh/id_ed25519 (what the users formula writes with
+      # ssh_key_type: ed25519)
+      identity_file: ''
+      # accept-new trusts the server key on first connect and refuses a
+      # changed key afterwards. Use `yes` when known_hosts is managed
+      # (e.g. openssh.known_hosts from the openssh formula).
+      strict_host_key_checking: accept-new
+      # Extra ssh_config options for the alias, e.g. {Compression: 'yes'}
+      options: {}
+      # Write <home>/.ssh/config. Set to false if the users formula manages
+      # it via `users:restic:ssh_config`.
+      manage_ssh_config: true
+
+    # Repository URL. Empty = sftp:<alias>:<repo_base>/<minion id>
+    # Any restic backend works, e.g. rest:https://user:pass@host:8000/repo
+    # or s3:... (put credentials into `env`).
+    repository: ''
+
+    # Repository password. Empty = generate a random one on the minion.
+    password: ''
+    # Copy a generated password to the master with cp.push
+    # (needs `file_recv: True` in the master config). Lands in
+    # /var/cache/salt/master/minions/<id>/files/var/lib/restic/.restic-password
+    push_password_to_master: true
+    # Also store the password next to the repository on the backup server.
+    # Convenient for restores, but anyone with access to the server can then
+    # decrypt the backups. Only works with the default sftp repository.
+    store_password_on_server: false
+
+    # Extra environment variables for restic (e.g. AWS_ACCESS_KEY_ID)
+    env: {}
+
+    # Files and directories to back up. Glob patterns are allowed; a pattern
+    # that matches nothing is skipped with a warning (not an error).
+    paths:
+      - /etc
+      - /root
+      - /var/lib/restic/data
+    # Exclude patterns (restic --exclude-file syntax)
+    excludes: []
+    # Extra arguments for `restic backup`
+    backup_args:
+      - --exclude-caches
+    # Tag set on every snapshot made by this formula. `forget` only touches
+    # snapshots with this tag, so manual snapshots are left alone.
+    tag: salt
+
+    # Shell commands run (as the restic user) before each backup,
+    # e.g. a database dump into /var/lib/restic/data
+    pre_backup: []
+
+    forget:
+      enabled: true
+      prune: true
+      # Group by host only, so changing `paths` does not leave the old
+      # snapshot group around forever (restic's default is host,paths).
+      group_by: host
+      keep:
+        last: 3
+        daily: 7
+        weekly: 4
+        monthly: 6
+
+    check:
+      # Run `restic check` after each backup
+      enabled: false
+      args:
+        - --read-data-subset=5%
+
+    schedule:
+      # systemd (timer), cron, or none
+      method: systemd
+      on_calendar: '*-*-* 02:00:00'
+      randomized_delay: 1h
+      nice: 10
+      # The systemd unit makes the system read-only for the job except the
+      # restic home. Add paths that pre_backup commands need to write to.
+      read_write_paths: []
+      cron:
+        minute: 0
+        hour: 2
+
+    # Heartbeat/dead-man's-switch URL (healthchecks.io, Better Stack, Uptime
+    # Kuma push, ...). Called after a successful run.
+    heartbeat_url: ''
+    # Appended to heartbeat_url when a run fails. Empty = don't report failures.
+    heartbeat_fail_suffix: /fail
+
+  monitoring:
+    # Used by restic.monitoring to register a heartbeat per minion.
+    betterstack:
+      api_token: ''
+      api_url: https://incidents.betterstack.com/api/v2/heartbeats
+      period: 86400
+      grace: 3600

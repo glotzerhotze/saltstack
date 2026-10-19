@@ -1,0 +1,11 @@
+#!/bin/bash
+# Managed by Salt (restic formula) - local changes will be overwritten.
+#
+# Runs restic against this host's repository, for example:
+#   sudo -u {{ restic.user.name }} {{ restic.wrapper }} snapshots
+#   sudo -u {{ restic.user.name }} {{ restic.wrapper }} ls latest /etc
+#   sudo -u {{ restic.user.name }} {{ restic.wrapper }} restore latest --target /tmp/restore --include /etc/hosts
+set -euo pipefail
+# shellcheck source=/dev/null
+. {{ restic.env_file | quote }}
+exec {{ restic.bin | quote }} "$@"

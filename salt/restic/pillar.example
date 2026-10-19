@@ -1,0 +1,157 @@
+# -*- coding: utf-8 -*-
+# vim: ft=yaml
+#
+# Example pillar for the restic formula, together with the users formula
+# and the openssh formula (saltstack-formulas/users-formula and
+# saltstack-formulas/openssh-formula).
+#
+# Generate one key pair for the backups on the master:
+#   ssh-keygen -N "" -t ed25519 -C restic@salt-master -f /root/restic_id_ed25519
+# and paste it below. Keeping the private key in pillar (instead of
+# salt://restic/id_ed25519 as in the original example) means only the
+# minions that are targeted with this pillar can read it.
+#
+# Suggested pillar top.sls:
+#   base:
+#     '*':                       # every host that is backed up
+#       - restic.client
+#     'backup.example.com':      # the backup server
+#       - restic.server
+#
+# Suggested state top.sls:
+#   base:
+#     '*':
+#       - users
+#       - openssh
+#       - restic                 # = restic.client
+#     'backup.example.com':
+#       - restic.server
+#
+# Order on first rollout: apply the server first, so it accepts the key
+# before the clients try to initialise their repositories.
+#
+# The two YAML documents below go into two separate pillar files. A host that
+# is both server and client gets both; Salt merges them.
+---
+
+########################################################################
+# pillar/restic/client.sls  (all backup clients)
+########################################################################
+
+users:
+  restic:
+    fullname: Restic Backup
+    home: /var/lib/restic
+    system: true
+    createhome: true
+    shell: /bin/bash
+    user_dir_mode: '0750'
+    # makes the users formula write ~/.ssh/id_ed25519
+    ssh_key_type: ed25519
+    ssh_keys:
+      privkey: |
+        -----BEGIN OPENSSH PRIVATE KEY-----
+        ...
+        -----END OPENSSH PRIVATE KEY-----
+      pubkey: ssh-ed25519 AAAAC3...  restic@salt-master
+    # Do NOT set `ssh_config` here: restic.client writes ~/.ssh/config.
+    # (Or set restic:client:sftp:manage_ssh_config: false and do it here.)
+
+restic:
+  # version: '0.19.1'
+  client:
+    sftp:
+      host: backup.example.com
+      # port: 22
+      # With openssh.known_hosts from the openssh formula you can pin the
+      # server key instead of trusting it on first use:
+      # strict_host_key_checking: 'yes'
+
+    paths:
+      - /etc
+      - /root
+      - /home
+      - /var/lib/restic/data
+    excludes:
+      - /home/*/.cache
+      - '*.tmp'
+
+    forget:
+      keep:
+        last: 3
+        daily: 7
+        weekly: 4
+        monthly: 6
+
+    schedule:
+      method: systemd          # systemd | cron | none
+      on_calendar: '*-*-* 02:00:00'
+      randomized_delay: 1h
+
+    # Optional: dump a database first (runs as the restic user)
+    # pre_backup:
+    #   - pg_dumpall > /var/lib/restic/data/postgres.sql
+
+    # Optional: dead man's switch, best set per minion
+    # heartbeat_url: https://hc-ping.com/<uuid>
+
+    # The repository password is generated on each minion and copied to the
+    # master (needs `file_recv: True` in /etc/salt/master). Alternatively set
+    # it per minion in pillar:
+    # password: <long random string>
+
+---
+########################################################################
+# pillar/restic/server.sls  (backup server only)
+########################################################################
+
+users:
+  restic:
+    fullname: Restic Backup
+    home: /var/lib/restic
+    system: true
+    createhome: true
+    shell: /bin/bash
+    user_dir_mode: '0750'
+    ssh_auth:
+      # `restrict,command="internal-sftp"` limits the key to SFTP: no shell,
+      # no port forwarding, even though all clients share it.
+      - 'restrict,command="internal-sftp" ssh-ed25519 AAAAC3...  restic@salt-master'
+
+# Optional, with the openssh formula: the same restriction for the whole
+# account, on top of the key option above.
+sshd_config:
+  matches:
+    restic_sftp_only:
+      type:
+        User: restic
+      options:
+        ForceCommand: internal-sftp
+        AllowTcpForwarding: 'no'
+        X11Forwarding: 'no'
+        PasswordAuthentication: 'no'
+  # If you use AllowUsers/AllowGroups, add `restic` there as well.
+
+restic:
+  repo_base: /var/lib/restic/repos
+  # server:
+  #   packages: [fuse3]        # for `restic mount` on the server
+
+########################################################################
+# Optional: Better Stack heartbeat per minion (state restic.monitoring)
+########################################################################
+# restic:
+#   monitoring:
+#     betterstack:
+#       api_token: <token>
+
+########################################################################
+# Optional: without the users formula
+########################################################################
+# restic:
+#   user:
+#     manage: true             # create the restic account in this formula
+#   server:
+#     authorized_keys:
+#       - 'restrict,command="internal-sftp" ssh-ed25519 AAAAC3...'
+# The client then still needs the private key in /var/lib/restic/.ssh/id_ed25519.

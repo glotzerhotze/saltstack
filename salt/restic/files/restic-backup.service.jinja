@@ -1,0 +1,27 @@
+# Managed by Salt (restic formula) - local changes will be overwritten.
+{%- set s = restic.client.schedule %}
+[Unit]
+Description=restic backup
+Documentation=https://restic.readthedocs.io/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User={{ restic.user.name }}
+Group={{ restic.user.group }}
+ExecStart={{ restic.backup_script }}
+Nice={{ s.nice }}
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+# The job only needs to read the system and write to its own home
+# (cache, ssh known_hosts, data dir). Do NOT add NoNewPrivileges= or other
+# options that imply it: that disables the file capability restic needs to
+# read all files.
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths={{ restic.user.home }}
+{%- for path in s.get('read_write_paths', []) %}
+ReadWritePaths={{ path }}
+{%- endfor %}
