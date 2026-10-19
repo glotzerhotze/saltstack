@@ -1,9 +1,6 @@
 [submodule "3pfs/users-formula"]
 	path = 3pfs/users-formula
 	url = https://github.com/saltstack-formulas/users-formula
-[submodule "3pfs/openssh-formula"]
-	path = 3pfs/openssh-formula
-	url = https://github.com/saltstack-formulas/openssh-formula.git
 [submodule "3pfs/apt-formula"]
 	path = 3pfs/apt-formula
 	url = https://github.com/saltstack-formulas/apt-formula.git
