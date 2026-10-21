@@ -39,10 +39,22 @@ addr-gen-mode=default
 method=auto
 EOF
 
+cat << EOF > /etc/NetworkManager/NetworkManager.conf
+[main]
+configure-and-quit=no
+no-auto-default=*
+plugins=keyfile
+
+[ifupdown]
+managed=false
+
+EOF
+
 chmod 600 /etc/NetworkManager/system-connections/schnorchel-mgmt.nmconnection
 rm -rf /etc/network/interfaces
 rm -rf /etc/NetworkManager/system-connections/'Wired connection 1'
 nmcli connection reload
 nmcli connection modify "Wired connection 1" connection.autoconnect no
 nmcli connection down "Wired connection 1"
+nmcli connection delete "Wired connection 1"
 nmcli connection up schnorchel-mgmt
