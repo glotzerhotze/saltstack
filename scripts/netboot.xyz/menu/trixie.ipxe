@@ -1,0 +1,204 @@
+#!ipxe
+# Custom netboot.xyz menu - preseeded Debian installs
+# Shared values are set once below; each machine's stub sets its own
+# values and jumps to :deb13_install, which builds the kernel command line.
+
+# ---- debian-installer parameters ------------------------------------------
+set http_server        192.168.23.80
+set di_preseed_url     http://${http_server}/preseed/preseed.cfg
+set di_vga             normal
+set di_locale          en_US
+set di_domain          mgmt.gz.klessen.cloud
+set di_auto            true
+set di_nameservers     192.168.23.3,192.168.23.33
+
+# ---- custom parameters (read from /proc/cmdline by your preseed scripts) --
+set net_mask           255.255.255.0
+set net_gw             192.168.23.254
+set net_ns_1           192.168.23.3
+set net_ns_2           192.168.23.33
+
+# ---- Debian release and installer location --------------------------------
+set deb_release        trixie
+set deb_arch           amd64
+set deb_dir            http://deb.debian.org/debian/dists/${deb_release}/main/installer-${deb_arch}/current/images/netboot/debian-installer/${deb_arch}
+
+# ---- nodes available for custom preseeded debian installation -------------
+# di_disk_<node>: install disk without /dev/, passed as partman-auto/disk.
+# The whole disk is erased.
+set crypto_root_passwd_w01 start1234
+set net_dev_w01            eno1
+set net_ip_w01             192.168.23.67
+set di_hostname_w01        worker-01
+set di_disk_w01            sda
+
+set crypto_root_passwd_w02 start1234
+set net_dev_w02            eno1
+set net_ip_w02             192.168.23.68
+set di_hostname_w02        worker-02
+set di_disk_w02            sda
+
+set crypto_root_passwd_w03 start1234
+set net_dev_w03            eno1
+set net_ip_w03             192.168.23.69
+set di_hostname_w03        worker-03
+set di_disk_w03            sda
+
+set crypto_root_passwd_w04 start1234
+set net_dev_w04            eno1
+set net_ip_w04             192.168.23.70
+set di_hostname_w04        worker-04
+set di_disk_w04            sda
+
+set crypto_root_passwd_w05 start1234
+set net_dev_w05            eno1
+set net_ip_w05             192.168.23.71
+set di_hostname_w05        worker-05
+set di_disk_w05            sda
+
+set crypto_root_passwd_s01 1beserverpword!
+set net_dev_s01            enp0s31f6
+set net_ip_s01             192.168.23.72
+set di_hostname_s01        server-01
+set di_disk_s01            sda
+
+set crypto_root_passwd_s02 start1234
+set net_dev_s02            eno1
+set net_ip_s02             192.168.23.73
+set di_hostname_s02        server-02
+set di_disk_s02            sda
+
+set crypto_root_passwd_s03 start1234
+set net_dev_s03            eno1
+set net_ip_s03             192.168.23.74
+set di_hostname_s03        server-03
+set di_disk_s03            sda
+
+# ---- menu -----------------------------------------------------------------
+:custom_menu
+menu Custom installs - Debian 13 ${deb_release}
+item --gap -- Debian - automated (ERASES THE DISK)
+item --gap -- Workers
+item deb13w01 ${di_hostname_w01} - ${net_dev_w01} (${net_ip_w01})
+item deb13w02 ${di_hostname_w02} - ${net_dev_w02} (${net_ip_w02})
+item deb13w03 ${di_hostname_w03} - ${net_dev_w03} (${net_ip_w03})
+item deb13w04 ${di_hostname_w04} - ${net_dev_w04} (${net_ip_w04})
+item deb13w05 ${di_hostname_w05} - ${net_dev_w05} (${net_ip_w05})
+item --gap -- Servers
+item deb13s01 ${di_hostname_s01} - ${net_dev_s01} (${net_ip_s01})
+item deb13s02 ${di_hostname_s02} - ${net_dev_s02} (${net_ip_s02})
+item deb13s03 ${di_hostname_s03} - ${net_dev_s03} (${net_ip_s03})
+item --gap --
+item return Back to netboot.xyz main menu
+choose --default return --timeout 10000 target || goto return
+goto ${target}
+
+# ---- per-machine stubs ----------------------------------------------------
+:deb13w01
+set node_hostname     ${di_hostname_w01}
+set node_dev          ${net_dev_w01}
+set node_ip           ${net_ip_w01}
+set node_crypto_pass  ${crypto_root_passwd_w01}
+set node_disk         ${di_disk_w01}
+goto deb13_install
+
+:deb13w02
+set node_hostname     ${di_hostname_w02}
+set node_dev          ${net_dev_w02}
+set node_ip           ${net_ip_w02}
+set node_crypto_pass  ${crypto_root_passwd_w02}
+set node_disk         ${di_disk_w02}
+goto deb13_install
+
+:deb13w03
+set node_hostname     ${di_hostname_w03}
+set node_dev          ${net_dev_w03}
+set node_ip           ${net_ip_w03}
+set node_crypto_pass  ${crypto_root_passwd_w03}
+set node_disk         ${di_disk_w03}
+goto deb13_install
+
+:deb13w04
+set node_hostname     ${di_hostname_w04}
+set node_dev          ${net_dev_w04}
+set node_ip           ${net_ip_w04}
+set node_crypto_pass  ${crypto_root_passwd_w04}
+set node_disk         ${di_disk_w04}
+goto deb13_install
+
+:deb13w05
+set node_hostname     ${di_hostname_w05}
+set node_dev          ${net_dev_w05}
+set node_ip           ${net_ip_w05}
+set node_crypto_pass  ${crypto_root_passwd_w05}
+set node_disk         ${di_disk_w05}
+goto deb13_install
+
+:deb13s01
+set node_hostname     ${di_hostname_s01}
+set node_dev          ${net_dev_s01}
+set node_ip           ${net_ip_s01}
+set node_crypto_pass  ${crypto_root_passwd_s01}
+set node_disk         ${di_disk_s01}
+goto deb13_install
+
+:deb13s02
+set node_hostname     ${di_hostname_s02}
+set node_dev          ${net_dev_s02}
+set node_ip           ${net_ip_s02}
+set node_crypto_pass  ${crypto_root_passwd_s02}
+set node_disk         ${di_disk_s02}
+goto deb13_install
+
+:deb13s03
+set node_hostname     ${di_hostname_s03}
+set node_dev          ${net_dev_s03}
+set node_ip           ${net_ip_s03}
+set node_crypto_pass  ${crypto_root_passwd_s03}
+set node_disk         ${di_disk_s03}
+goto deb13_install
+
+# ---- shared install routine -----------------------------------------------
+:deb13_install
+# Refuse to boot without an install disk (empty di_disk_<node>).
+isset ${node_disk} || goto no_disk
+set di_params priority=critical vga=${di_vga} locale=${di_locale} hostname=${node_hostname} domain=${di_domain} auto-install/enable=${di_auto} netcfg/choose_interface=${node_dev} netcfg/get_nameservers=${di_nameservers} partman-auto/disk=/dev/${node_disk} preseed/url=${di_preseed_url}
+set custom_params crypto_root_passwd=${node_crypto_pass} http_server=${http_server} net_dev_1=${node_dev} net_ns_1=${net_ns_1} net_ns_2=${net_ns_2} net_ip_1=${node_ip} net_gw_1=${net_gw} net_mask_1=${net_mask}
+echo
+echo Installing ${node_hostname}.${di_domain} - ${node_dev} (${node_ip}) - erases /dev/${node_disk}
+echo Kernel command line:
+echo ${di_params} ${custom_params}
+echo
+# Last chance: any key returns to the menu, otherwise the install starts.
+prompt --timeout 10000 Press any key within 10 seconds to cancel... && goto custom_menu ||
+
+# FIX: unregister every image iPXE is still holding before loading the
+# installer. iPXE builds initrd.magic from ALL registered images, so the
+# netboot.xyz menu scripts (and any kernel/initrd left over from an earlier
+# attempt) were being glued in front of initrd.gz. The kernel then can't
+# unpack the initramfs and panics with "Unable to mount root fs".
+# This is what netboot.xyz's own Debian menu does before every boot.
+imgfree
+
+# Nothing after "---", so none of these parameters (including the
+# passphrase) are copied into the installed system's GRUB config.
+kernel ${deb_dir}/linux initrd=initrd.magic ${di_params} ${custom_params} --- || goto failed
+initrd ${deb_dir}/initrd.gz || goto failed
+boot || goto failed
+
+:failed
+echo
+echo Download or boot failed - check that deb.debian.org is reachable.
+prompt Press any key to return to the menu...
+goto custom_menu
+
+:no_disk
+echo
+echo ERROR: no install disk set for ${node_hostname}.
+echo Set its di_disk_<node> value (e.g. sda, nvme0n1) in menu/trixie.ipxe.
+echo Nothing was booted and no disk was changed.
+prompt Press any key to return to the menu...
+goto custom_menu
+
+:return
+exit
