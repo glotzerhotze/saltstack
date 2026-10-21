@@ -4,8 +4,10 @@ nm_connections:
   # Where NetworkManager's keyfile plugin reads system-wide profiles from.
   config_dir: /etc/NetworkManager/system-connections
 
-  # Run `nmcli connection reload` after files changed (only when
-  # NetworkManager is active and the system is not transactional).
+  # Tell the running NetworkManager about changed files: `nmcli connection
+  # reload` for profiles, `nmcli general reload conf` (or a restart, see
+  # conf.restart) for NetworkManager.conf. Only when NetworkManager is active
+  # and the system is not transactional.
   reload: true
 
   # Seconds `nmcli --wait` waits when a connection is (re)activated.
@@ -18,3 +20,13 @@ nm_connections:
 
   # <name>: {ensure: present|absent, activate: bool, settings: {...}}
   connections: {}
+
+  # NetworkManager's own configuration. The file is left alone until
+  # `settings` has at least one section.
+  conf:
+    path: /etc/NetworkManager/NetworkManager.conf
+    # Restart NetworkManager after a change instead of reloading it. Some
+    # settings (e.g. [main] plugins) are only read at startup.
+    restart: false
+    # <section>: {key: value}
+    settings: {}

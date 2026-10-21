@@ -1,10 +1,12 @@
 {#-
   nm_connections - manage system-wide NetworkManager connection profiles
-  (keyfiles in /etc/NetworkManager/system-connections/<name>.nmconnection).
+  (keyfiles in /etc/NetworkManager/system-connections/<name>.nmconnection)
+  and, optionally, /etc/NetworkManager/NetworkManager.conf.
 
   Pillar layout: see pillar.example. Every profile is described as keyfile
   settings, either flat ("ipv4.method: manual") or nested
-  ("ipv4: {method: manual}"); both may be mixed.
+  ("ipv4: {method: manual}"); both may be mixed. NetworkManager.conf is
+  described nested only ("main: {plugins: [ifupdown, keyfile]}").
 -#}
 {%- from tpldir ~ "/map.jinja" import nm with context %}
 
@@ -31,6 +33,85 @@
 {%-   else -%}{% for i in v %}{{ esc(i) | replace(';', '\\;') }};{% endfor -%}
 {%-   endif -%}
 {%- endmacro %}
+
+{#- Same for NetworkManager.conf, whose lists are separated by "," -#}
+{%- macro confval(v) -%}
+{%-   if v is sameas true or v is sameas false -%}{{ v | lower }}
+{%-   elif v is string or v is number -%}{{ esc(v) }}
+{%-   else -%}{% for i in v %}{{ esc(i) | replace(',', '\\,') }}{% if not loop.last %},{% endif %}{% endfor -%}
+{%-   endif -%}
+{%- endmacro %}
+
+{#- NetworkManager.conf. Only managed when conf.settings has sections, so
+    hosts without that pillar keep the file their package installed. #}
+{%- set conf = nm.conf %}
+{%- if conf is not mapping %}
+{{ raise('nm_connections: "conf" must be a mapping {path, restart, settings}') }}
+{%- endif %}
+{%- set conf_settings = conf.get('settings') or {} %}
+{%- if conf_settings is not mapping %}
+{{ raise('nm_connections: conf.settings must be a mapping of <section>: {key: value}') }}
+{%- endif %}
+
+{%- if conf_settings %}
+{%-   set conf_path = conf.get('path') %}
+{%-   if conf_path is not string or not conf_path.startswith('/') %}
+{{ raise('nm_connections: conf.path must be an absolute path, got "' ~ conf_path ~ '"') }}
+{%-   endif %}
+
+{%-   set conf_ordered = [] %}
+{%-   for section in (conf_settings.keys() | select('equalto', 'main') | list) + (conf_settings.keys() | reject('equalto', 'main') | sort) %}
+{%-     set options = conf_settings[section] or {} %}
+{%-     if section is not match(section_re) %}
+{{ raise('nm_connections: conf: invalid section name "' ~ section ~ '"') }}
+{%-     elif options is not mapping %}
+{{ raise('nm_connections: conf: section "' ~ section ~ '" must be a mapping of key: value') }}
+{%-     endif %}
+{%-     set opts = [] %}
+{%-     for key, value in options | dictsort %}
+{%-       if key is not match(key_re) %}
+{{ raise('nm_connections: conf: invalid key "' ~ section ~ '.' ~ key ~ '"') }}
+{%-       elif value is mapping %}
+{{ raise('nm_connections: conf: value of "' ~ section ~ '.' ~ key ~ '" must be a scalar or a list') }}
+{%-       elif value is not none and not (value is iterable and value is not string and value | length == 0) %}
+{%-         set rendered = confval(value) | string %}
+{%-         if '\n' in rendered or '\r' in rendered %}
+{{ raise('nm_connections: conf: value of "' ~ section ~ '.' ~ key ~ '" contains a line break') }}
+{%-         endif %}
+{%-         do opts.append([key, rendered]) %}
+{%-       endif %}
+{%-     endfor %}
+{%-     do conf_ordered.append([section, opts]) %}
+{%-   endfor %}
+
+nm_connections_conf:
+  file.managed:
+    - name: {{ conf_path | tojson }}
+    - source: salt://{{ tpldir }}/files/NetworkManager.conf.jinja
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: '0644'
+    - makedirs: True
+    - context:
+        sections: {{ conf_ordered | tojson }}
+
+{%-   if runtime %}
+
+{#- Applied before the profiles below are reloaded. A reload does not pick
+    up every setting, see conf.restart. #}
+nm_connections_conf_apply:
+  cmd.run:
+{%-     if conf.get('restart', False) | to_bool %}
+    - name: systemctl restart NetworkManager.service
+{%-     else %}
+    - name: nmcli general reload conf
+{%-     endif %}
+    - onlyif: {{ nm_is_active }}
+    - onchanges:
+      - file: nm_connections_conf
+{%-   endif %}
+{%- endif %}
 
 {%- set declared    = [] %}  {#- paths owned by this formula (present + absent) #}
 {%- set changed_ids = [] %}  {#- file states whose changes trigger a reload #}
@@ -182,7 +263,7 @@ nm_connections_reload:
 {%-   endfor %}
 {%- endif %}
 
-{%- if not changed_ids %}
+{%- if not changed_ids and not conf_settings %}
 
 nm_connections_nothing_declared:
   test.nop

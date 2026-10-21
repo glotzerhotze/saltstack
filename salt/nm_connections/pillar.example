@@ -90,3 +90,35 @@ nm_connections:
     # Remove a profile created by the installer.
     Wired connection 1:
       ensure: absent
+
+  # /etc/NetworkManager/NetworkManager.conf, written as
+  #   <section>: {key: value, ...}
+  # Hosts without conf.settings keep the file their package installed.
+  # YAML lists become "a,b", YAML booleans become true/false, a key set to
+  # null is left out, a section without keys is written as an empty [section].
+  # Quote values YAML would otherwise change: '*' (alias), 'no'/'yes'/'on'/'off'
+  # (booleans). Reference: `man NetworkManager.conf`.
+  conf:
+    # path: /etc/NetworkManager/NetworkManager.conf
+    # true: restart NetworkManager after a change instead of
+    # `nmcli general reload conf`. Settings such as [main] plugins or
+    # [ifupdown] managed are only read at startup.
+    restart: false
+    settings:
+      main:
+        # plugins:
+        # rc-manager: auto
+        # migrate-ifcfg-rh: false
+        # auth-polkit: true
+        # dhcp: internal
+        # iwd-config-path:
+        configure-and-quit: 'no'
+        no-auto-default: '*'
+        plugins: [ifupdown, keyfile]
+      ifupdown:
+        managed: false
+      logging:
+        # backend: journal
+        # audit: false
+      device:
+        # wifi.backend: wpa_supplicant

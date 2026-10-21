@@ -7,4 +7,5 @@
 {%- do nm.update({
       'connections': nm.get('connections') or {},
       'purge_keep': nm.get('purge_keep') or [],
+      'conf': nm.get('conf') or {},
     }) %}

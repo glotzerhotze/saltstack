@@ -9,9 +9,10 @@ base:
     - apt.apt_conf
     - apt.preferences
     - apt.unattended
-    - openssh.banner
+    - openssh
     - openssh.config
     - openssh.client
+    - openssh.banner
     - packages
 {%- if 'raspberry pi' not in grains.get('productname', '') | lower %}
     - packages.backports_kernel
