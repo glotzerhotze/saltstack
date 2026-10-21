@@ -22,4 +22,4 @@ echo "export MASK2=${net_mask_2}" >> /tmp/net_env.var
 echo "export BC2=${net_bc_2}" >> /tmp/net_env.var
 echo "export DOMAIN=${domain}" >> /tmp/net_env.var
 echo "export BOOTSRV=${http_server}" >> /tmp/net_env.var
-echo "export KERNEL_HOSTNAME=${node_hostname}" >> /tmp/net_env.var
+echo "export KERNEL_HOSTNAME=${hostname}" >> /tmp/net_env.var

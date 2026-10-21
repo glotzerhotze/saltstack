@@ -24,55 +24,60 @@ set deb_arch           amd64
 set deb_dir            http://deb.debian.org/debian/dists/${deb_release}/main/installer-${deb_arch}/current/images/netboot/debian-installer/${deb_arch}
 
 # ---- nodes available for custom preseeded debian installation -------------
-# di_disk_<node>: install disk without /dev/, passed as partman-auto/disk.
-# The whole disk is erased.
+# di_disk_<node>: install disk as its /dev/disk/by-id/ name, without that
+# prefix, e.g. ata-Samsung_SSD_870_EVO_1TB_S6PUNX0R123456 or
+# nvme-Samsung_SSD_980_1TB_S64ANS0T123456. The whole disk is erased.
+# Find it on the host with: ls -l /dev/disk/by-id/ | grep -v -- -part
+# Or set any value (e.g. unknown) and boot: the installer stops before
+# partitioning and lists the ids of the disks it found.
+# Empty: the menu refuses to boot the host.
 set crypto_root_passwd_w01 start1234
 set net_dev_w01            eno1
 set net_ip_w01             192.168.23.67
 set di_hostname_w01        worker-01
-set di_disk_w01            sda
+set di_disk_w01
 
 set crypto_root_passwd_w02 start1234
 set net_dev_w02            eno1
 set net_ip_w02             192.168.23.68
 set di_hostname_w02        worker-02
-set di_disk_w02            sda
+set di_disk_w02
 
 set crypto_root_passwd_w03 start1234
 set net_dev_w03            eno1
 set net_ip_w03             192.168.23.69
 set di_hostname_w03        worker-03
-set di_disk_w03            sda
+set di_disk_w03
 
 set crypto_root_passwd_w04 start1234
 set net_dev_w04            eno1
 set net_ip_w04             192.168.23.70
 set di_hostname_w04        worker-04
-set di_disk_w04            sda
+set di_disk_w04
 
 set crypto_root_passwd_w05 start1234
 set net_dev_w05            eno1
 set net_ip_w05             192.168.23.71
 set di_hostname_w05        worker-05
-set di_disk_w05            sda
+set di_disk_w05
 
-set crypto_root_passwd_s01 1beserverpword!
+set crypto_root_passwd_s01 start1234
 set net_dev_s01            enp0s31f6
 set net_ip_s01             192.168.23.72
 set di_hostname_s01        server-01
-set di_disk_s01            sda
+set di_disk_s01            ata-WDC_WDS120G1G0A-00SS50_172304A01BCC
 
 set crypto_root_passwd_s02 start1234
 set net_dev_s02            eno1
 set net_ip_s02             192.168.23.73
 set di_hostname_s02        server-02
-set di_disk_s02            sda
+set di_disk_s02
 
 set crypto_root_passwd_s03 start1234
 set net_dev_s03            eno1
 set net_ip_s03             192.168.23.74
 set di_hostname_s03        server-03
-set di_disk_s03            sda
+set di_disk_s03
 
 # ---- menu -----------------------------------------------------------------
 :custom_menu
@@ -162,10 +167,10 @@ goto deb13_install
 :deb13_install
 # Refuse to boot without an install disk (empty di_disk_<node>).
 isset ${node_disk} || goto no_disk
-set di_params priority=critical vga=${di_vga} locale=${di_locale} hostname=${node_hostname} domain=${di_domain} auto-install/enable=${di_auto} netcfg/choose_interface=${node_dev} netcfg/get_nameservers=${di_nameservers} partman-auto/disk=/dev/${node_disk} preseed/url=${di_preseed_url}
+set di_params priority=critical vga=${di_vga} locale=${di_locale} hostname=${node_hostname} domain=${di_domain} auto-install/enable=${di_auto} netcfg/choose_interface=${node_dev} netcfg/get_nameservers=${di_nameservers} partman-auto/disk=/dev/disk/by-id/${node_disk} preseed/url=${di_preseed_url}
 set custom_params crypto_root_passwd=${node_crypto_pass} http_server=${http_server} net_dev_1=${node_dev} net_ns_1=${net_ns_1} net_ns_2=${net_ns_2} net_ip_1=${node_ip} net_gw_1=${net_gw} net_mask_1=${net_mask}
 echo
-echo Installing ${node_hostname}.${di_domain} - ${node_dev} (${node_ip}) - erases /dev/${node_disk}
+echo Installing ${node_hostname}.${di_domain} - ${node_dev} (${node_ip}) - erases /dev/disk/by-id/${node_disk}
 echo Kernel command line:
 echo ${di_params} ${custom_params}
 echo
@@ -195,7 +200,8 @@ goto custom_menu
 :no_disk
 echo
 echo ERROR: no install disk set for ${node_hostname}.
-echo Set its di_disk_<node> value (e.g. sda, nvme0n1) in menu/trixie.ipxe.
+echo Set its di_disk_<node> value in menu/trixie.ipxe to the
+echo /dev/disk/by-id/ name of its disk (ls -l /dev/disk/by-id/ on the host).
 echo Nothing was booted and no disk was changed.
 prompt Press any key to return to the menu...
 goto custom_menu
