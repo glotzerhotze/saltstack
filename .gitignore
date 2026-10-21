@@ -1,5 +1,5 @@
 config/onepassword.token
 pillar/*
-scripts/netboot.xyz/menu/trixie.ipxe
+./scripts/netboot.xyz/assets/menu/trixie.ipxe
 .DS_Store
 .idea/

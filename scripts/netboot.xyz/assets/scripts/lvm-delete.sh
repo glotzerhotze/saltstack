@@ -6,7 +6,7 @@ set -o pipefail
 ##
 ### setup env_vars - we need KUBE_ROLE here
 ##
-source /root/net_env.var
+source /etc/net_env.var
 
 ## delete the obsolete logical volume deleteme mounted at /data (because no free disk-space via debian-installer)
 umount /dev/mapper/vg0-deleteme

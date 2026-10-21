@@ -13,7 +13,7 @@ set -o pipefail
 ##
 ### source environment first and make sure nothing is empty
 ##
-source /root/net_env.var
+source /etc/net_env.var
 : "${NETDEV:?}" "${IP:?}" "${GW:?}" "${DNS1:?}" "${DNS2:?}" "${DOMAIN:?}"
 
 ## install NetworkManager and purge netinst setup
@@ -40,7 +40,7 @@ cat << EOF > "$CONN"
 
 [connection]
 id=schnorchel-mgmt
-uuid=97ea5a2e-7a51-312f-838e-bf402f666166
+uuid=c1c77320-1ecf-36e7-8d1f-eeac1c1a8b96
 type=ethernet
 interface-name=${NETDEV}
 autoconnect=true

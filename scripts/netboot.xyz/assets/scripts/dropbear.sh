@@ -6,7 +6,7 @@ set -o pipefail
 ##
 ### source environment first
 ##
-source /root/net_env.var
+source /etc/net_env.var
 
 ##
 ### setup dropbear-ssh-root-decrypt config
