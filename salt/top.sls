@@ -20,6 +20,7 @@ base:
     - quadlets
     - restic.client
     - luks_lvm
+    - locale
 
   'server-01':
     - restic.server
