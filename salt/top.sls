@@ -19,6 +19,7 @@ base:
 {%- endif %}
     - quadlets
     - restic.client
+    - luks_lvm
 
-  'rpi-01':
+  'server-01':
     - restic.server
