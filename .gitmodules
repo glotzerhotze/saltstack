@@ -16,3 +16,6 @@
 [submodule "3pfs/openssh-formula"]
 	path = 3pfs/openssh-formula
 	url = https://github.com/greenaar/openssh-formula.git
+[submodule "3pfs/locale-formula"]
+	path = 3pfs/locale-formula
+	url = https://github.com/greenaar/locale-formula.git
