@@ -1,0 +1,83 @@
+# -*- coding: utf-8 -*-
+# vim: ft=yaml
+#
+# Example pillar for the luks_lvm formula.
+#
+# Find stable disk names with:   ls -l /dev/disk/by-id/
+# Prefer the ata-/nvme-/scsi- names that include the serial number; avoid
+# the -partN entries (this formula encrypts whole disks).
+#
+# Keep `key` values out of plain-text pillar: use the GPG renderer
+# (#!yaml|gpg) or another secrets backend.
+
+luks_lvm:
+  # --- optional global settings (defaults shown) -----------------------------
+  # keydir: /etc/luks-keys
+  # luks_format_opts: --type luks2
+  # crypttab_opts: luks,nofail        # add ",discard" for SSD TRIM
+  # mount_opts: defaults,nofail
+  # fs: ext4
+  # resizefs: true
+  # mkfs_opts:
+  #   ext4: -m 1
+
+  # --- LUKS devices: one entry per disk --------------------------------------
+  # The key is the dm name: the disk is unlocked as /dev/mapper/<name> and
+  # gets that name in /etc/crypttab.
+  devices:
+
+    # 1) Two blank disks -> LUKS2 each -> one LVM volume group across both.
+    crypt_data1:
+      disk: /dev/disk/by-id/ata-WDC_WD40EFRX-68N32N0_WD-WCC7K1234567
+      key: "replace-me-with-a-long-random-secret-1"
+      vg: vg_data
+    crypt_data2:
+      disk: /dev/disk/by-id/ata-WDC_WD40EFRX-68N32N0_WD-WCC7K7654321
+      key: "replace-me-with-a-long-random-secret-2"
+      vg: vg_data
+
+    # 2) A disk that already has LUKS with LVM inside (set up by hand or on
+    #    another machine). It is never reformatted: unlocked with the key,
+    #    its VG activated, and the LVs listed under vgs: mounted.
+    crypt_old:
+      disk: /dev/disk/by-id/nvme-Samsung_SSD_980_PRO_1TB_S5GXNF0R123456A
+      key: "the-existing-passphrase-of-that-disk"
+      vg: vg_old
+      crypttab_opts: luks,nofail,discard   # per-device override
+
+    # 3) A disk that already has LUKS with a filesystem directly inside (no
+    #    LVM). Unlocked and mounted at `mountpoint`. Set `fs` to the real
+    #    filesystem type. If this disk were blank it would get LUKS + `fs`.
+    crypt_archive:
+      disk: /dev/disk/by-id/usb-WD_Elements_25A3_575831314135-0:0
+      # Use a key file that already exists on the minion instead of `key`:
+      keyfile: /root/archive.key
+      fs: xfs
+      mountpoint: /mnt/archive
+      opts: defaults,nofail,noatime,x-systemd.device-timeout=10s
+
+  # --- Volume groups and logical volumes -------------------------------------
+  vgs:
+    vg_data:
+      lvs:
+        srv:
+          size: 200G           # created if missing, grown if you raise it
+          fs: ext4
+          mountpoint: /srv
+        media:
+          extents: 100%FREE    # only used at creation time
+          fs: xfs
+          mountpoint: /srv/media
+          opts: defaults,nofail,noatime
+        vm_disk:               # no fs, no mountpoint -> raw LV
+          size: 50G
+
+    vg_old:
+      lvs:
+        # No size/extents: the LV must already exist; it is only mounted.
+        home:
+          fs: ext4
+          mountpoint: /mnt/old-home
+        backup:
+          fs: btrfs
+          mountpoint: /mnt/old-backup

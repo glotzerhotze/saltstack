@@ -1,0 +1,49 @@
+# -*- coding: utf-8 -*-
+# vim: ft=yaml
+#
+# Defaults for the luks_lvm formula. Everything here can be overridden
+# under the `luks_lvm` pillar key (dicts are merged, lists are replaced).
+luks_lvm:
+  # Where key files written from pillar (`key:`) end up. One file per device.
+  keydir: /etc/luks-keys
+
+  # Extra options for `cryptsetup luksFormat` (only used on blank disks).
+  # cryptsetup 2.7 on trixie already defaults to aes-xts-plain64 / argon2id.
+  luks_format_opts: --type luks2
+
+  # Options written to /etc/crypttab. `nofail` keeps a missing disk from
+  # blocking boot. Add `discard` to allow TRIM through the LUKS layer.
+  crypttab_opts: luks,nofail
+
+  # Default fstab options for every mount this formula manages.
+  mount_opts: defaults,nofail
+
+  # Filesystem used when a mount target does not set `fs`.
+  fs: ext4
+
+  # Grow the filesystem together with the LV when a pillar size is increased
+  # (`lvresize --resizefs`). Works for ext4 and xfs; set false for btrfs.
+  resizefs: true
+
+  # Default mkfs options per filesystem type, e.g. `ext4: -m 1`.
+  mkfs_opts: {}
+
+  # Base packages. On trixie the crypttab generator lives in the separate
+  # `systemd-cryptsetup` package; without it /etc/crypttab is ignored at boot.
+  pkgs:
+    - cryptsetup
+    - systemd-cryptsetup
+    - lvm2
+
+  # Package providing mkfs.<fs>; installed only for filesystems in use.
+  fs_pkgs:
+    ext2: e2fsprogs
+    ext3: e2fsprogs
+    ext4: e2fsprogs
+    xfs: xfsprogs
+    btrfs: btrfs-progs
+    vfat: dosfstools
+    f2fs: f2fs-tools
+
+  devices: {}
+  vgs: {}

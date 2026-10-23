@@ -1,0 +1,188 @@
+{#- -*- coding: utf-8 -*-
+    vim: ft=jinja
+
+    Loads defaults.yaml, merges the `luks_lvm` pillar over it, validates it
+    and normalises it into the structure the state files consume:
+
+      luks_lvm.devices  name -> {disk, mapper, keyfile, key_managed, vg, ...}
+      luks_lvm.vgs      vg   -> {devices: [names], lvs: [ {...}, ... ]}
+      luks_lvm.mounts   [ {id, device, fs, mountpoint, opts, req_mod, req_id, parents}, ... ]
+      luks_lvm.pkgs     packages to install
+
+    Errors in the pillar abort rendering with a readable message instead of
+    doing something unexpected to a disk.
+-#}
+{%- import_yaml tpldir ~ "/defaults.yaml" as defaults %}
+{%- set cfg = salt["pillar.get"]("luks_lvm", default=defaults.luks_lvm, merge=True) %}
+
+{#- Salt's regex_match returns the match groups, so the pattern needs one. #}
+{%- set name_re = "^([A-Za-z0-9_.+][A-Za-z0-9_.+-]*)$" %}
+{%- set devices = {} %}
+{%- set vgs = {} %}
+{%- set mounts = [] %}
+{%- set pkgs = (cfg.pkgs or []) | list %}
+{%- set mkfs_defaults = cfg.mkfs_opts or {} %}
+
+{#- ------------------------------------------------------------------ devices #}
+{%- for name, raw in (cfg.devices or {}) | dictsort %}
+{%-   set raw = raw or {} %}
+{%-   if not name | regex_match(name_re) %}
+{{-     raise("luks_lvm: device name '" ~ name ~ "' may only contain letters, digits and _.+-") }}
+{%-   endif %}
+{%-   if not raw.get("disk") %}
+{{-     raise("luks_lvm: device '" ~ name ~ "' has no 'disk' set") }}
+{%-   endif %}
+{%-   if not raw.disk.startswith("/dev/disk/by-id/") %}
+{{-     raise("luks_lvm: device '" ~ name ~ "': disk must be a /dev/disk/by-id/ path, got '" ~ raw.disk ~ "'") }}
+{%-   endif %}
+{%-   if raw.get("vg") and raw.get("mountpoint") %}
+{{-     raise("luks_lvm: device '" ~ name ~ "' sets both 'vg' and 'mountpoint'; use one (LVM inside LUKS, or a filesystem directly inside LUKS)") }}
+{%-   endif %}
+
+{%-   if raw.get("key") is not none and raw.get("key") != "" %}
+{%-     set keyfile = raw.get("keyfile") or (cfg.keydir ~ "/" ~ name ~ ".key") %}
+{%-     set key_managed = true %}
+{%-   elif raw.get("keyfile") %}
+{%-     set keyfile = raw.keyfile %}
+{%-     set key_managed = false %}
+{%-   else %}
+{{-     raise("luks_lvm: device '" ~ name ~ "' needs either 'key' (written to a key file) or 'keyfile' (an existing file on the minion)") }}
+{%-   endif %}
+
+{%-   set crypttab_opts = raw.get("crypttab_opts", cfg.crypttab_opts) %}
+{%-   if crypttab_opts is string %}
+{%-     set crypttab_list = crypttab_opts.split(",") %}
+{%-   else %}
+{%-     set crypttab_list = crypttab_opts | list %}
+{%-   endif %}
+{%-   if raw.get("open_opts") is not none %}
+{%-     set open_opts = raw.open_opts %}
+{%-   elif "discard" in crypttab_list %}
+{%-     set open_opts = "--allow-discards" %}
+{%-   else %}
+{%-     set open_opts = "" %}
+{%-   endif %}
+
+{%-   do devices.update({name: {
+        "name": name,
+        "disk": raw.disk,
+        "mapper": "/dev/mapper/" ~ name,
+        "keyfile": keyfile,
+        "key_managed": key_managed,
+        "luks_format_opts": raw.get("luks_format_opts", cfg.luks_format_opts),
+        "crypttab": raw.get("crypttab", true),
+        "crypttab_opts": crypttab_list | join(","),
+        "open_opts": open_opts,
+        "vg": raw.get("vg"),
+      }}) %}
+
+{#-   A filesystem directly inside LUKS (no LVM) - typical for an existing disk. #}
+{%-   if raw.get("mountpoint") %}
+{%-     do mounts.append({
+          "id": "dev-" ~ name,
+          "device": "/dev/mapper/" ~ name,
+          "fs": raw.get("fs", cfg.fs),
+          "mkfs_opts": raw.get("mkfs_opts", mkfs_defaults.get(raw.get("fs", cfg.fs), "")),
+          "mountpoint": raw.mountpoint,
+          "opts": raw.get("opts", cfg.mount_opts),
+          "req_mod": "cmd",
+          "req_id": "luks_lvm-" ~ name ~ "-open",
+        }) %}
+{%-   endif %}
+
+{%-   if raw.get("vg") %}
+{%-     if not raw.vg | regex_match(name_re) %}
+{{-       raise("luks_lvm: device '" ~ name ~ "': invalid VG name '" ~ raw.vg ~ "'") }}
+{%-     endif %}
+{%-     if raw.vg not in vgs %}
+{%-       do vgs.update({raw.vg: {"name": raw.vg, "devices": [], "lvs": []}}) %}
+{%-     endif %}
+{%-     do vgs[raw.vg].devices.append(name) %}
+{%-   endif %}
+{%- endfor %}
+
+{#- ---------------------------------------------------------------------- vgs #}
+{%- for vgname, rawvg in (cfg.vgs or {}) | dictsort %}
+{%-   set rawvg = rawvg or {} %}
+{%-   if vgname not in vgs %}
+{{-     raise("luks_lvm: VG '" ~ vgname ~ "' is defined under vgs but no device has 'vg: " ~ vgname ~ "'") }}
+{%-   endif %}
+{%-   for lvname, rawlv in (rawvg.get("lvs") or {}) | dictsort %}
+{%-     set rawlv = rawlv or {} %}
+{%-     if not lvname | regex_match(name_re) %}
+{{-       raise("luks_lvm: invalid LV name '" ~ vgname ~ "/" ~ lvname ~ "'") }}
+{%-     endif %}
+{%-     if rawlv.get("size") and rawlv.get("extents") %}
+{{-       raise("luks_lvm: LV '" ~ vgname ~ "/" ~ lvname ~ "' sets both size and extents") }}
+{%-     endif %}
+{%-     set lv_id = "luks_lvm-lv-" ~ vgname ~ "-" ~ lvname %}
+{%-     set creatable = (rawlv.get("size") or rawlv.get("extents")) and true or false %}
+{%-     do vgs[vgname].lvs.append({
+          "id": lv_id,
+          "name": lvname,
+          "path": "/dev/" ~ vgname ~ "/" ~ lvname,
+          "size": rawlv.get("size"),
+          "extents": rawlv.get("extents"),
+          "resizefs": rawlv.get("resizefs", cfg.resizefs),
+          "creatable": creatable,
+          "pct": (rawlv.get("extents") and "%" in rawlv.extents | string) and true or false,
+        }) %}
+{#-     No mountpoint and no fs: a raw LV (VM disk, database volume, ...). #}
+{%-     if rawlv.get("mountpoint") or rawlv.get("fs") %}
+{%-       set fs = rawlv.get("fs", cfg.fs) %}
+{%-       do mounts.append({
+            "id": "lv-" ~ vgname ~ "-" ~ lvname,
+            "device": "/dev/" ~ vgname ~ "/" ~ lvname,
+            "fs": fs,
+            "mkfs_opts": rawlv.get("mkfs_opts", mkfs_defaults.get(fs, "")),
+            "mountpoint": rawlv.get("mountpoint"),
+            "opts": rawlv.get("opts", cfg.mount_opts),
+            "req_mod": creatable and "lvm" or "cmd",
+            "req_id": lv_id,
+          }) %}
+{%-     endif %}
+{%-   endfor %}
+{%- endfor %}
+
+{#- ------------------------------------------------- mount ordering + extras #}
+{%- set seen_mp = [] %}
+{%- for m in mounts %}
+{%-   if m.mountpoint %}
+{%-     if m.mountpoint in seen_mp %}
+{{-       raise("luks_lvm: mountpoint '" ~ m.mountpoint ~ "' is used more than once") }}
+{%-     endif %}
+{%-     do seen_mp.append(m.mountpoint) %}
+{%-   endif %}
+{#-   Mount /srv before /srv/media if both are managed here. #}
+{%-   set parents = [] %}
+{%-   for o in mounts %}
+{%-     if o.mountpoint and m.mountpoint and o.id != m.id
+           and m.mountpoint.startswith(o.mountpoint.rstrip("/") ~ "/") %}
+{%-       do parents.append(o.id) %}
+{%-     endif %}
+{%-   endfor %}
+{#-   x-systemd.* style options never show up in /proc/mounts; tell
+      mount.mounted to ignore them so it does not remount on every run. #}
+{%-   set inv_opts = [] %}
+{%-   set inv_keys = [] %}
+{%-   set opts_list = m.opts.split(",") if m.opts is string else m.opts | list %}
+{%-   for o in opts_list %}
+{%-     if o.startswith("x-") or o in ["noauto", "auto"] %}
+{%-       if "=" in o %}{% do inv_keys.append(o.split("=")[0]) %}{% else %}{% do inv_opts.append(o) %}{% endif %}
+{%-     endif %}
+{%-   endfor %}
+{%-   do m.update({"parents": parents, "opts": opts_list | join(","),
+                   "invisible_opts": inv_opts, "invisible_keys": inv_keys}) %}
+{%-   set fs_pkg = (cfg.fs_pkgs or {}).get(m.fs) %}
+{%-   if fs_pkg and fs_pkg not in pkgs %}
+{%-     do pkgs.append(fs_pkg) %}
+{%-   endif %}
+{%- endfor %}
+
+{%- set luks_lvm = {
+      "keydir": cfg.keydir,
+      "pkgs": pkgs,
+      "devices": devices,
+      "vgs": vgs,
+      "mounts": mounts,
+    } %}
