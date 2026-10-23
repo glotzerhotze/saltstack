@@ -24,7 +24,7 @@ way.
 | `defaults.yaml` | defaults for every option |
 | `files/connection.nmconnection.jinja` | template for a connection profile |
 | `files/NetworkManager.conf.jinja` | template for NetworkManager.conf |
-| `pillar.example` | commented example of every option |
+| `pillar.example.sls` | commented example of every option |
 
 ## What a run does
 
@@ -62,7 +62,7 @@ Bad pillar data stops the render with an error that starts with
 deeply, so a host file can then override single keys. Lists are replaced, not
 merged.
 
-All keys live under `nm_connections:`. See `pillar.example` for a full
+All keys live under `nm_connections:`. See `pillar.example.sls` for a full
 example.
 
 | Key | Default | Meaning |

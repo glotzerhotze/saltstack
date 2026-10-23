@@ -26,7 +26,7 @@ instead of duplicating what they already manage.
 
 ## Rollout
 
-1. Create one key pair on the master and put it into pillar, see `pillar.example`
+1. Create one key pair on the master and put it into pillar, see `pillar.example.sls`
    (`users:restic:ssh_keys` for clients, `users:restic:ssh_auth` for the server).
 2. To keep generated repository passwords on the master, set in `/etc/salt/master`:
    ```yaml
@@ -129,3 +129,10 @@ server and client on one host via SFTP, repository init over the
 `restic check`, idempotent re-runs, version change, rejected bad checksum,
 heartbeat success and failure pings. The systemd units pass
 `systemd-analyze verify`; the timer itself was not run (no systemd in the test container).
+
+## Passwords
+
+Create passwords with this command:
+```shell
+openssl rand -hex 20
+```
