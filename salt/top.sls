@@ -24,3 +24,4 @@ base:
 
   'server-01':
     - restic.server
+    - samba
