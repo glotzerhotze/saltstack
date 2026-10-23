@@ -19,3 +19,6 @@
 [submodule "3pfs/locale-formula"]
 	path = 3pfs/locale-formula
 	url = https://github.com/greenaar/locale-formula.git
+[submodule "3pfs/samba-formula"]
+	path = 3pfs/samba-formula
+	url = git@github.com:greenaar/samba-formula.git
