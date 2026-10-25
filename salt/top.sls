@@ -21,6 +21,7 @@ base:
     - restic.client
     - luks_lvm
     - locale
+    - write_environment
 
   'server-01':
     - restic.server
