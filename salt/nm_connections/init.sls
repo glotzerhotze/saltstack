@@ -15,6 +15,12 @@
 {%- set name_re      = '^[A-Za-z0-9]([A-Za-z0-9 _.@+-]*[A-Za-z0-9_.@+-])?$' %}
 {%- set section_re   = '^[^][\\s]+$' %}
 {%- set key_re       = '^[^][\\s=#;]+$' %}
+{#- Keyfile keys NetworkManager treats as secrets (psk, *password,
+    password-raw, pin, private-key, preshared-key, mka-cak, wep-key0-3),
+    plus everything in [vpn-secrets]. The *-flags keys are not secret. -#}
+{%- set secret_key     = '(?:[^=\\s]*-)?(?:psk|password|password-raw|pin|private-key|preshared-key|mka-cak|wep-key[0-3])' %}
+{%- set secret_key_re  = '^' ~ secret_key ~ '$' %}
+{%- set secret_line_re = '^\\s*(?:' ~ secret_key ~ '\\s*=|\\[vpn-secrets\\])' %}
 {%- set nm_is_active = 'systemctl is-active --quiet NetworkManager.service' %}
 {#- On transactional systems (SL Micro) the files land in the new snapshot,
     so poking the running NetworkManager would only reload the old ones. -#}
@@ -176,6 +182,7 @@ nm_connections_conf_apply:
 {%-     endif %}
 
 {%-     set ordered = [] %}
+{%-     set secrets = [] %}
 {%-     for section in ['connection'] + (sections.keys() | reject('equalto', 'connection') | sort) %}
 {%-       if section is not match(section_re) %}
 {{ raise('nm_connections: ' ~ name ~ ': invalid section name "' ~ section ~ '"') }}
@@ -192,10 +199,16 @@ nm_connections_conf_apply:
 {{ raise('nm_connections: ' ~ name ~ ': value of "' ~ section ~ '.' ~ key ~ '" contains a line break') }}
 {%-           endif %}
 {%-           do opts.append([key, rendered]) %}
+{%-           if section == 'vpn-secrets' or key is match(secret_key_re) %}
+{%-             do secrets.append(section ~ '.' ~ key) %}
+{%-           endif %}
 {%-         endif %}
 {%-       endfor %}
 {%-       do ordered.append([section, opts]) %}
 {%-     endfor %}
+{#-     Hide the diff when the profile writes a secret, or when the file on
+        disk still holds one (the diff would show it as a removed line). #}
+{%-     set hide_diff = secrets or (salt['file.file_exists'](path) and salt['file.search'](path, secret_line_re)) %}
 
 {{ sid | tojson }}:
   file.managed:
@@ -206,7 +219,9 @@ nm_connections_conf_apply:
     - user: root
     - group: root
     - mode: '0600'
+{%-     if hide_diff %}
     - show_changes: False
+{%-     endif %}
     - makedirs: True
     - context:
         sections: {{ ordered | tojson }}

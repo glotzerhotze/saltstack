@@ -35,8 +35,8 @@ way.
    `nmcli general reload conf`, or restarted when `conf:restart` is true.
 3. **Connection profiles**: every entry under `connections` is validated,
    normalised into keyfile sections and written as `<name>.nmconnection`
-   (`root:root 0600`, without diffs in the output). `ensure: absent` removes
-   the file instead.
+   (`root:root 0600`; the diff is hidden if the profile holds a secret, see
+   **Secrets** below). `ensure: absent` removes the file instead.
 4. **Purge** (off by default): regular files in `config_dir` that are not
    declared and don't match `purge_keep` are removed.
 5. If any profile file changed, `nmcli connection reload` runs once. Then
@@ -182,9 +182,15 @@ master while pillar is rendered. Always quote them with `yaml_dquote`:
 wifi-security.psk: {{ salt['onepassword.read']('op://infra/<item>/<field>') | yaml_dquote }}
 ```
 
-Profiles are written with `show_changes: False`, so secret values don't show
-up in diffs or job returns. NetworkManager.conf shows its diff, so don't put
-secrets there.
+A profile is written with `show_changes: False`, so secret values don't show
+up in diffs or job returns, when it sets a key NetworkManager treats as a
+secret: `psk`, `wep-key0`–`wep-key3`, any key ending in `password` (including
+`leap-password` and `private-key-password`), `password-raw`, `pin`,
+`private-key`, `preshared-key`, `mka-cak`, or anything in `[vpn-secrets]`.
+The same applies when the file on disk still contains one of these keys,
+because otherwise the diff would show the old value as a removed line. Every
+other profile shows its normal diff. NetworkManager.conf always shows its
+diff, so don't put secrets there.
 
 ## Testing a change
 
@@ -197,5 +203,5 @@ podman exec -it salt-master salt '<minion>' state.apply nm_connections test=True
 ```
 
 `test=True` shows which files would change and which `nmcli` or
-`systemctl` commands would run. The diff of NetworkManager.conf is shown;
-the diffs of profiles are not.
+`systemctl` commands would run. Diffs are shown, except for profiles that
+contain a secret.
