@@ -22,3 +22,6 @@
 [submodule "3pfs/samba-formula"]
 	path = 3pfs/samba-formula
 	url = git@github.com:greenaar/samba-formula.git
+[submodule "3pfs/write_environment-formula"]
+	path = 3pfs/write_environment-formula
+	url = git@github.com:greenaar/write_environment-formula.git
