@@ -3,7 +3,7 @@
 Salt states, pillar, reactor and master config for a small home fleet (Debian
 trixie hosts and Raspberry Pis). The master is the
 [cdalvaro/docker-salt-master](https://github.com/cdalvaro/docker-salt-master)
-container, running under Podman on `192.168.23.64` as the systemd unit
+container, running under Podman on `192.168.23.65` as the systemd unit
 `salt-master`. Nothing in this repo runs locally. You edit files here, then
 `scripts/deploy.sh` rsyncs them into the container's volumes.
 
@@ -57,6 +57,12 @@ Container conventions to follow:
   file is silently ignored too, so double-check file names.
 - `pillar/<formula>/`: one directory per formula, named after the formula's
   top-level pillar key.
+- `pillar/ipam.yaml`: every fleet IP and MAC address (subnets, gateways,
+  host interfaces, macvlan shims, container IPs and MACs, DNS servers).
+  Pillar files look addresses up with the macros in `pillar/ipam.jinja`
+  (`ip`, `ips`, `cidr`, `mac`) instead of hard-coding them. A lookup that
+  misses fails the pillar render.
+  Neither file is in `top.sls`; they are only imported.
 - `reactor/local_grains.sls`: wired up in `config/10-reactor.conf`. It runs
   `state.apply local_grains` on a minion at `salt/minion/*/start` and on the
   custom event `custom/grains/sync`.
@@ -150,7 +156,7 @@ There is no local Salt or CI. Before suggesting a deploy:
 2. After deploying, check on the master, as a dry run first:
 
    ```bash
-   ssh root@192.168.23.64
+   ssh root@192.168.23.65
    podman exec -it salt-master salt '<minion>' pillar.items          # pillar renders?
    podman exec -it salt-master salt '<minion>' state.show_sls <sls>  # states render?
    podman exec -it salt-master salt '<minion>' state.apply test=True # dry run
@@ -167,7 +173,7 @@ There is no local Salt or CI. Before suggesting a deploy:
 ## Do not
 
 - Run `scripts/deploy.sh`, `state.apply` without `test=True`, or anything that
-  touches `192.168.23.64` or the minions unless the user explicitly asks. Both
+  touches `192.168.23.65` or the minions unless the user explicitly asks. Both
   change live hosts.
 - Edit or commit inside `3pfs/*` submodules.
 - Hard-code host paths or minion IDs in states. Per-host data belongs in
