@@ -146,6 +146,20 @@ restic:
 #       api_token: <token>
 
 ########################################################################
+# On demand: restore (state restic.restore). Pass this as command-line
+# pillar, not in a pillar file:
+#   salt <minion> state.apply restic.restore pillar='{"restic": {"restore": {"target": "/", "include": ["/etc/hosts"], "dry_run": true}}}'
+########################################################################
+# restic:
+#   restore:
+#     snapshot: latest         # or an ID, or '<id>:<subfolder>'
+#     target: /var/tmp/restore # required; / restores in place
+#     include: [/etc/hosts]
+#     exclude: []
+#     dry_run: true
+#     args: [--overwrite, if-newer]
+
+########################################################################
 # Optional: without the users formula
 ########################################################################
 # restic:

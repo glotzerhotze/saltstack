@@ -5,7 +5,24 @@
 #   sudo -u {{ restic.user.name }} {{ restic.wrapper }} snapshots
 #   sudo -u {{ restic.user.name }} {{ restic.wrapper }} ls latest /etc
 #   sudo -u {{ restic.user.name }} {{ restic.wrapper }} restore latest --target /tmp/restore --include /etc/hosts
+#
+# Run it as root to restore in place: only root can write everywhere and give
+# the files back their owners.
+#   sudo {{ restic.wrapper }} restore latest --target / --include /etc/hosts
+{%- set ssh_dir = restic.user.home ~ '/.ssh' %}
 set -euo pipefail
 # shellcheck source=/dev/null
 . {{ restic.env_file | quote }}
+{%- if restic.repository.startswith('sftp:') %}
+
+# root has no SSH setup for the backup server, so borrow the restic user's
+# config, key and known_hosts.
+if [ "$(id -u)" -eq 0 ]; then
+    sftp_args={{ ('-i ' ~ restic.identity_file ~ ' -o UserKnownHostsFile=' ~ ssh_dir ~ '/known_hosts') | quote }}
+    if [ -f {{ (ssh_dir ~ '/config') | quote }} ]; then
+        sftp_args={{ ('-F ' ~ ssh_dir ~ '/config ') | quote }}"$sftp_args"
+    fi
+    exec {{ restic.bin | quote }} -o "sftp.args=$sftp_args" "$@"
+fi
+{%- endif %}
 exec {{ restic.bin | quote }} "$@"

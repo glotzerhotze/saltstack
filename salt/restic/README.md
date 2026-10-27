@@ -22,6 +22,7 @@ instead of duplicating what they already manage.
 | `restic.install` | – | download, verify and install the binary (included by the above) |
 | `restic.user` | – | requires the users formula, or creates the account when `restic:user:manage: true` |
 | `restic.report` | clients | show the latest snapshots: `salt '*' state.apply restic.report` |
+| `restic.restore` | clients, on demand | restore a snapshot as root, see [Restore](#restore) |
 | `restic.monitoring` | clients (optional) | register a Better Stack heartbeat once per minion |
 
 ## Rollout
@@ -83,14 +84,65 @@ Further changes:
 ```sh
 # on a client, as root
 sudo -u restic /var/lib/restic/bin/restic-repo snapshots
-sudo -u restic /var/lib/restic/bin/restic-repo restore latest --target /tmp/restore --include /etc/hosts
+sudo -u restic /var/lib/restic/bin/restic-repo ls latest /etc
+
+# restore as root: in place, with the original owners
+/var/lib/restic/bin/restic-repo restore latest --target / --include /etc/hosts
 
 # run a backup now / see the last run
 systemctl start restic-backup.service
 journalctl -u restic-backup.service -n 50
 ```
 
-**Restore after losing a machine:** the generated password is on the master at
+## Restore
+
+`restic.restore` runs `restic restore` as root through `restic-repo`. It is
+not in the highstate. Apply it on purpose and pass the options as
+command-line pillar (`restic:restore` in `defaults.yaml`):
+
+```sh
+# 1. find the snapshot
+salt rpi-01 state.apply restic.report
+
+# 2. preview: restic restore --dry-run -vv, writes nothing
+salt rpi-01 state.apply restic.restore pillar='{"restic": {"restore": {
+  "target": "/", "include": ["/var/lib/containers/storage/volumes/foo"], "dry_run": true}}}'
+
+# 3. restore for real (drop "dry_run")
+salt rpi-01 state.apply restic.restore pillar='{"restic": {"restore": {
+  "target": "/", "include": ["/var/lib/containers/storage/volumes/foo"]}}}'
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `snapshot` | `latest` | snapshot ID, `latest`, or `<snapshot>:<subfolder>` to restore only that folder |
+| `target` | (required) | staging directory (files land at `<target>/<full path>`), or `/` to restore in place |
+| `include` / `exclude` | `[]` | restic `--include` / `--exclude` patterns; empty = whole snapshot |
+| `dry_run` | `false` | add `--dry-run -vv`: list what would change, write nothing |
+| `args` | `[]` | extra `restic restore` arguments, e.g. `["--overwrite", "if-newer"]`, `["--verify"]` |
+
+- `test=True` only shows the command. `dry_run` asks restic itself.
+- The restore runs as root, so ownership and permissions come back as they
+  were. root borrows the restic user's `~/.ssh/config`, key and
+  `known_hosts` for SFTP (`restic -o sftp.args=…`, restic 0.17+).
+- In place, restic overwrites existing files (`--overwrite always` by
+  default; `if-changed`, `if-newer`, `never` via `args`) and leaves files
+  that are not in the snapshot alone. `--delete` (in `args`) removes those
+  too; try it with `dry_run` first. restic refuses `--target / --delete` without an
+  include or exclude filter.
+- Stop whatever writes to the restored paths first. For container volumes
+  that means the containers, e.g. `salt rpi-01 service.stop <name>.service`.
+- The state includes `restic.client`, so on a fresh host it sets up the
+  client before restoring.
+
+**Restore after losing a machine.** With the password in pillar
+(`restic:client:password`, here from 1Password), a host rebuilt under the
+same minion id gets the same password and repository on its first highstate.
+Then run `restic.restore` with `"target": "/"`. Pick the snapshot ID from
+`restic.report` instead of `latest` if the timer already ran on the empty
+host, because that new snapshot is `latest` now.
+
+With a generated password, it is on the master at
 `/var/cache/salt/master/minions/<id>/files/var/lib/restic/.restic-password`.
 On the backup server:
 
@@ -129,6 +181,8 @@ server and client on one host via SFTP, repository init over the
 `restic check`, idempotent re-runs, version change, rejected bad checksum,
 heartbeat success and failure pings. The systemd units pass
 `systemd-analyze verify`; the timer itself was not run (no systemd in the test container).
+`restic.restore` and running `restic-repo` as root were added later and have
+not been tested on a live host yet.
 
 ## Passwords
 

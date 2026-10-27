@@ -142,6 +142,26 @@ restic:
     # Appended to heartbeat_url when a run fails. Empty = don't report failures.
     heartbeat_fail_suffix: /fail
 
+  # Used by restic.restore, which only runs when applied explicitly. Pass
+  # these as command-line pillar instead of keeping them in pillar files.
+  restore:
+    # Snapshot ID, `latest`, or `<snapshot>:<subfolder>` to restore only that
+    # folder (its contents land directly in `target`). Quote IDs, so YAML
+    # does not read an all-digit ID as a number.
+    snapshot: latest
+    # Required. A staging directory (files land below it with their full
+    # path, e.g. <target>/etc/hosts), or / to restore in place.
+    target: ''
+    # restic --include / --exclude patterns. Empty = the whole snapshot.
+    include: []
+    exclude: []
+    # true = `restic restore --dry-run -vv`: list what would change, write
+    # nothing.
+    dry_run: false
+    # Extra arguments for `restic restore`, e.g. [--overwrite, if-newer] or
+    # [--verify].
+    args: []
+
   monitoring:
     # Used by restic.monitoring to register a heartbeat per minion.
     betterstack:
