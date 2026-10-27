@@ -1,0 +1,97 @@
+# Defaults for the acme_sh formula. Override any of these in pillar under the
+# `acme_sh` key (see pillar.example).
+acme_sh:
+  # acme.sh release to install: a git tag, branch or commit
+  version: '3.1.6'
+  repo: https://github.com/acmesh-official/acme.sh.git
+  # where the git checkout is kept
+  source_dir: /usr/local/src/acme.sh
+
+  # acme.sh directories (--home, --config-home, --cert-home)
+  home: /opt/acme.sh
+  config_home: /etc/acme.sh
+  cert_home: /etc/acme.sh
+
+  # per-certificate files this formula renders (options, hook scripts)
+  state_dir: /etc/acme.sh/salt
+  # let `acme.sh --install` add acme.sh's usual `acme.sh` alias (with these
+  # directories) to root's shell profile; false passes --noprofile
+  profile: true
+
+  # account e-mail used when acme.sh registers with a CA (optional for
+  # Let's Encrypt, required by ZeroSSL)
+  email: ''
+
+  packages:
+    - git
+    - curl
+    - openssl
+    - socat
+
+  renewal:
+    # systemd: a timer runs `acme.sh --cron` once a day
+    # cron:    a root cron job does the same
+    # none:    no automatic renewal
+    method: systemd
+    on_calendar: daily
+    # also run this long after boot, to catch up on runs missed while the
+    # machine was off (false to disable). The timer deliberately does not use
+    # Persistent=true: that makes it require the mount units for
+    # /var/lib/systemd/timers, so it cannot start where var.mount is masked.
+    on_boot: 15min
+    randomized_delay: 1h
+
+  # certificates without dest_dir are copied to <dest_base>/<certificate name>/
+  dest_base: /etc/ssl/acme
+
+  # defaults for every certificate; any key can be overridden per certificate
+  cert_defaults:
+    # letsencrypt, letsencrypt_test, zerossl, buypass, google, or a directory URL
+    server: letsencrypt
+    # ec-256, ec-384, ec-521, 2048, 3072, 4096
+    keylength: ec-256
+    # how to prove control of the domains, e.g.
+    #   {method: dns, provider: dns_cf}
+    #   {method: webroot, webroot: /var/www/html}
+    #   {method: standalone} / {method: alpn} / {method: nginx} / {method: apache}
+    challenge: {}
+    # environment for acme.sh --issue, e.g. DNS API credentials; acme.sh
+    # stores them for renewals
+    env: {}
+    # renew this many days after issuance (unset: acme.sh default / ARI)
+    days: null
+    # ACME profile (e.g. shortlived, tlsserver) if the CA offers profiles
+    profile: null
+    preferred_chain: null
+
+    # where the certificate is copied to; null means <dest_base>/<name>
+    dest_dir: null
+    # file names inside dest_dir (or absolute paths); null skips that file
+    files:
+      key: privkey.pem
+      cert: cert.pem
+      ca: chain.pem
+      fullchain: fullchain.pem
+    user: root
+    group: root
+    dir_mode: '0755'
+    key_mode: '0600'
+    cert_mode: '0644'
+
+    # commands (a string or a list) run by acme.sh on issue and every renewal:
+    #   pre_hook    before the certificate is requested
+    #   reload_cmd  after the files have been copied to their destination
+    #   post_hook   after the attempt, whether it succeeded or not
+    #   renew_hook  after a successful renewal (not on the first issue)
+    pre_hook: []
+    reload_cmd: []
+    post_hook: []
+    renew_hook: []
+
+    # further acme.sh --issue arguments, e.g. ['--local-address', '192.0.2.1']
+    extra_args: []
+
+    # true: remove the certificate from acme.sh and delete its files
+    absent: false
+
+  certificates: {}

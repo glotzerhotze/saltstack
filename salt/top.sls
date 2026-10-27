@@ -22,6 +22,7 @@ base:
     - luks_lvm
     - locale
     - write_environment
+    - acme_sh
 
   'server-01':
     - restic.server

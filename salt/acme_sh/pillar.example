@@ -1,0 +1,93 @@
+# Example pillar for the acme_sh formula. Every key is optional except the
+# certificates themselves; see acme_sh/defaults.yaml for all defaults.
+acme_sh:
+  email: hostmaster@example.com
+  # version: '3.1.6'
+
+  renewal:
+    method: systemd        # systemd | cron | none
+
+  # Settings shared by all certificates (merged into each one)
+  cert_defaults:
+    server: letsencrypt    # letsencrypt_test while you try things out
+    keylength: ec-256
+    challenge:
+      method: dns
+      provider: dns_cf
+    env:
+      CF_Token: 'cloudflare-api-token'
+      CF_Account_ID: 'cloudflare-account-id'
+
+  certificates:
+
+    # Wildcard cert via Cloudflare DNS (method and credentials from
+    # cert_defaults). Files land in /etc/ssl/acme/example.com/:
+    # privkey.pem, cert.pem, chain.pem, fullchain.pem
+    example.com:
+      domains:
+        - example.com
+        - '*.example.com'
+      reload_cmd: systemctl reload nginx
+
+    # Webroot validation, files in a directory of your choice, readable by
+    # the ssl-cert group, nginx reloaded after every issue/renewal.
+    www.example.org:
+      domains:
+        - www.example.org
+        - example.org
+      challenge:
+        method: webroot
+        webroot: /var/www/example.org
+      dest_dir: /etc/nginx/tls/example.org
+      group: ssl-cert
+      key_mode: '0640'
+      reload_cmd: systemctl reload nginx
+
+    # Standalone validation on port 80: stop the web server before the
+    # certificate is requested and start it again afterwards. post_hook also
+    # runs when the request fails, but not when reload_cmd fails, and
+    # reload_cmd runs before it: use a command that cannot fail here.
+    mail.example.net:
+      challenge:
+        method: standalone
+      pre_hook:
+        - systemctl stop apache2
+      post_hook:
+        - systemctl start apache2
+      reload_cmd:
+        - systemctl try-reload-or-restart postfix dovecot
+      # absolute paths are used as given; null skips a file
+      files:
+        key: /etc/postfix/tls/mail.key
+        fullchain: /etc/postfix/tls/mail.crt
+        cert: null
+        ca: null
+
+    # HAProxy wants key and chain in one file: build it in reload_cmd.
+    # Hook commands can use $CERT_KEY_PATH, $CERT_FULLCHAIN_PATH, $CERT_PATH,
+    # $CA_CERT_PATH (acme.sh's own copies) and $Le_Domain.
+    lb.example.com:
+      challenge:
+        method: dns
+        provider: dns_hetzner
+      env:
+        HETZNER_Token: 'hetzner-dns-token'
+      dest_dir: /etc/haproxy/certs/lb.example.com
+      reload_cmd: |
+        cat "$CERT_FULLCHAIN_PATH" "$CERT_KEY_PATH" > /etc/haproxy/certs/lb.example.com.pem
+        chmod 0600 /etc/haproxy/certs/lb.example.com.pem
+        systemctl reload haproxy
+      renew_hook: logger -t acme "renewed $Le_Domain"
+
+    # RSA key, shorter-lived certificate profile, staging CA
+    test.example.com:
+      server: letsencrypt_test
+      keylength: 2048
+      profile: shortlived
+      challenge:
+        method: webroot
+        webroot: /var/www/html
+
+    # Remove a certificate: drops it from acme.sh and deletes its files
+    old.example.com:
+      absent: true

@@ -1,0 +1,23 @@
+{#- Builds the `acme_sh` settings dict: defaults.yaml < OS values < pillar #}
+{%- import_yaml tpldir ~ '/defaults.yaml' as defaults %}
+
+{%- set os_values = salt['grains.filter_by']({
+      'Debian': {'cron_package': 'cron'},
+      'RedHat': {'cron_package': 'cronie'},
+      'Suse':   {'cron_package': 'cronie'},
+      'Arch':   {'cron_package': 'cronie'},
+    }, grain='os_family', default='Debian') %}
+{%- do defaults.acme_sh.update(os_values) %}
+
+{%- set acme_sh = salt['pillar.get']('acme_sh', default=defaults.acme_sh, merge=True) %}
+
+{#- acme.sh plus the directory options every call needs #}
+{%- do acme_sh.update({
+      'command': [
+        acme_sh.home ~ '/acme.sh',
+        '--home', acme_sh.home,
+        '--config-home', acme_sh.config_home,
+        '--cert-home', acme_sh.cert_home,
+      ],
+      'header': '# Managed by Salt (acme_sh formula). Do not edit.',
+    }) %}
