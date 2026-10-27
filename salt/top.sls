@@ -1,7 +1,11 @@
 base:
   # Defaults for all minions
   '*':
+    - luks_lvm
     - local_grains
+    - locale
+    - write_environment
+    - acme_sh
     - users
     - nm_connections
     - apt_keyrings
@@ -19,10 +23,6 @@ base:
 {%- endif %}
     - quadlets
     - restic.client
-    - luks_lvm
-    - locale
-    - write_environment
-    - acme_sh
 
   'server-01':
     - restic.server
