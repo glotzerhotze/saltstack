@@ -8,11 +8,12 @@ base:
     - acme_sh
     - users
     - nm_connections
-    - apt_keyrings
     - apt.repositories
     - apt.apt_conf
     - apt.preferences
     - apt.unattended
+    - apt.update
+    - apt.upgrade
     - openssh
     - openssh.config
     - openssh.client

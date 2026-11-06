@@ -1,9 +1,6 @@
 [submodule "3pfs/users-formula"]
 	path = 3pfs/users-formula
 	url = https://github.com/saltstack-formulas/users-formula
-[submodule "3pfs/apt-formula"]
-	path = 3pfs/apt-formula
-	url = https://github.com/saltstack-formulas/apt-formula.git
 [submodule "3pfs/mounts-formula"]
 	path = 3pfs/mounts-formula
 	url = https://github.com/saltstack-formulas/mounts-formula.git
@@ -25,3 +22,6 @@
 [submodule "3pfs/write_environment-formula"]
 	path = 3pfs/write_environment-formula
 	url = git@github.com:greenaar/write_environment-formula.git
+[submodule "3pfs/apt-formula"]
+	path = 3pfs/apt-formula
+	url = git@github.com:greenaar/apt-formula

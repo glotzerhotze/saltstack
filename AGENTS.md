@@ -39,15 +39,12 @@ Container conventions to follow:
 ## Directory guide
 
 - `salt/top.sls`: the highstate. Every minion gets `local_grains`, `users`,
-  `apt_keyrings`, `apt.*`, `packages` and `nm_connections`.
+  `apt.*`, `packages` and `nm_connections`.
   `packages.backports_kernel` is skipped on Raspberry Pis (checked with
   `grains['productname']`).
 - `salt/<formula>/`: in-house formulas.
   - `local_grains`: writes `pillar:local_grains` into grains, then refreshes
     grains.
-  - `apt_keyrings`: downloads and verifies apt signing keys into
-    `/etc/apt/keyrings`. The `files/keyring.sh` helper checks fingerprints and
-    rejects weak SHA-1 bindings that Debian 13's sqv verifier refuses.
   - `nm_connections`: manages NetworkManager keyfiles. Its `README.md`
     documents the pillar schema.
   - `packages/backports_kernel.sls`: extends the upstream `packages` formula.
@@ -57,6 +54,10 @@ Container conventions to follow:
   file is silently ignored too, so double-check file names.
 - `pillar/<formula>/`: one directory per formula, named after the formula's
   top-level pillar key.
+- `pillar/apt/common.sls`: pillar for the greenaar apt formula in
+  `3pfs/apt-formula`. Third-party signing keys are set per repository with
+  `key_url`. Keep the `signed-by` file name ending in `.asc`, so Salt stores
+  the armored key without needing `gpg`.
 - `pillar/ipam.yaml`: every fleet IP and MAC address (subnets, gateways,
   host interfaces, macvlan shims, container IPs and MACs, DNS servers).
   Pillar files look addresses up with the macros in `pillar/ipam.jinja`
@@ -97,7 +98,7 @@ Container conventions to follow:
   `{{ raise('<formula>: …') }}`. Don't silently skip bad data.
 - Use `tpldir` for paths that refer back to the formula itself, so it can be
   relocated.
-- State IDs are prefixed with the formula name (`apt-keyring-<name>`,
+- State IDs are prefixed with the formula name (`restic-download`,
   `nm_connection_<name>`). Keep requisites (`require`, `onchanges`) explicit.
 - States must be idempotent. Use `unless`/`onlyif`/`onchanges` on `cmd.run`.
 - Branch on hardware or OS with grains, as the existing files already do

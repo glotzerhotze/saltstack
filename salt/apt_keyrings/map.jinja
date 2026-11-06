@@ -1,5 +1,0 @@
-{#- -*- coding: utf-8 -*- #}
-{#- vim: ft=jinja #}
-{%- import_yaml "apt_keyrings/defaults.yaml" as defaults %}
-{%- set apt_keyrings = salt['pillar.get'](
-      'apt_keyrings', default=defaults.apt_keyrings, merge=True) %}
