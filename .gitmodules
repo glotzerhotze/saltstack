@@ -25,3 +25,6 @@
 [submodule "3pfs/apt-formula"]
 	path = 3pfs/apt-formula
 	url = git@github.com:greenaar/apt-formula
+[submodule "3pfs/telegraf-formula"]
+	path = 3pfs/telegraf-formula
+	url = git@github.com:greenaar/telegraf-formula.git
