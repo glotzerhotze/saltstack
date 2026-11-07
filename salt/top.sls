@@ -24,6 +24,7 @@ base:
 {%- endif %}
     - quadlets
     - restic.client
+    - telegraf.agent
 
   'server-01':
     - restic.server
