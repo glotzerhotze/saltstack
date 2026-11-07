@@ -50,7 +50,7 @@ domain is the name acme.sh files the certificate under.
 | `env` | `{}` | Environment for `acme.sh --issue`, e.g. DNS API credentials (`CF_Token`). Passed to the command, never put on its command line |
 | `dest_dir` | `<dest_base>/<key>` | Directory the files are copied to (`dest_base` defaults to `/etc/ssl/acme`) |
 | `files` | `privkey.pem`, `cert.pem`, `chain.pem`, `fullchain.pem` | Keys `key`, `cert`, `ca`, `fullchain`; relative to `dest_dir` or absolute; `null` skips a file |
-| `user`, `group` | `root` | Owner of the copied files and of `dest_dir` |
+| `user`, `group` | `root` | Owner of the copied files and of `dest_dir`: a name that exists on the minion, or a numeric ID, quoted or not (e.g. the UID/GID a container runs as) |
 | `key_mode`, `cert_mode`, `dir_mode` | `0600`, `0644`, `0755` | Permissions |
 | `pre_hook` | – | Commands run before the certificate is requested |
 | `reload_cmd` | – | Commands run after the files have been copied |

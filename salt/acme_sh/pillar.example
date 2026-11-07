@@ -79,6 +79,18 @@ acme_sh:
         systemctl reload haproxy
       renew_hook: logger -t acme "renewed $Le_Domain"
 
+    # Files in a container volume, owned by the UID/GID the container runs
+    # as. Numeric IDs need no matching user or group on the host.
+    app.example.com:
+      files:
+        key: /var/lib/containers/storage/volumes/app-certs/_data/app.pem.key
+        fullchain: /var/lib/containers/storage/volumes/app-certs/_data/app.pem
+        cert: null
+        ca: null
+      user: 99
+      group: 99
+      reload_cmd: systemctl try-restart app.service
+
     # RSA key, shorter-lived certificate profile, staging CA
     test.example.com:
       server: letsencrypt_test

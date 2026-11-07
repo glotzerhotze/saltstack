@@ -72,6 +72,8 @@ acme_sh:
       cert: cert.pem
       ca: chain.pem
       fullchain: fullchain.pem
+    # owner of the copied files and of dest_dir: a name that exists on the
+    # minion, or a numeric ID (e.g. the UID/GID a container runs as)
     user: root
     group: root
     dir_mode: '0755'

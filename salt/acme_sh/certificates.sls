@@ -152,6 +152,22 @@ include:
 {%-   endfor %}
 {%-   set env_hash = salt['hashutil.sha256_digest'](env | dictsort | tojson) %}
 
+{#-   Owner of the copied files and of dest_dir: a name, or a numeric ID such
+      as the UID a container runs as. Salt only takes numeric IDs as integers
+      (a string is looked up as a name), and ignores an owner of 0, so 0
+      becomes root. #}
+{%-   set owner = {} %}
+{%-   for key in ['user', 'group'] %}
+{%-     set value = cert.get(key) %}
+{%-     if value is none or (value | string) == '' %}
+{{ raise('acme_sh: certificate "' ~ name ~ '" needs a ' ~ key ~ ' (a name or a numeric ID)') }}
+{%-     elif (value | string) is match('^[0-9]+$') %}
+{%-       do owner.update({key: (value | int) or 'root'}) %}
+{%-     else %}
+{%-       do owner.update({key: value | string}) %}
+{%-     endif %}
+{%-   endfor %}
+
 {%-   set managed = [] %}
 
 {%-   for file, commands in scripts | dictsort %}
@@ -213,8 +229,8 @@ include:
 {{ sid }}_dest_dir:
   file.directory:
     - name: {{ dest_dir | tojson }}
-    - user: {{ cert.user | tojson }}
-    - group: {{ cert.group | tojson }}
+    - user: {{ owner.user | tojson }}
+    - group: {{ owner.group | tojson }}
     - mode: {{ cert.dir_mode | string | tojson }}
     - makedirs: True
 {%-   endif %}
@@ -231,8 +247,8 @@ include:
       - {{ path | tojson }}:
         - mode: {{ (cert.key_mode if kind == 'key' else cert.cert_mode) | string | tojson }}
 {%-     endfor %}
-    - user: {{ cert.user | tojson }}
-    - group: {{ cert.group | tojson }}
+    - user: {{ owner.user | tojson }}
+    - group: {{ owner.group | tojson }}
     - replace: False
     - makedirs: True
 {%-     if uses_dest_dir %}
