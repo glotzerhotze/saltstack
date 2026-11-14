@@ -17,7 +17,7 @@
 {#- renovate: depName=docker.io/pihole/pihole #}
 {%- set pihole_version = '2026.10.0' %}
 {#- renovate: depName=docker.io/klutchell/unbound #}
-{%- set unbound_version = '1.24.2' %}
+{%- set unbound_version = 'v1.26.2' %}
 {#- renovate: depName=ghcr.io/netbootxyz/netbootxyz #}
 {%- set netbootxyz_version = '0.7.6-nbxyz26' %}
 {#- grafana: a nightly build from grafana-dev (what grafana:main pointed to).

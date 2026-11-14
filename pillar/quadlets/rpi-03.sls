@@ -15,7 +15,7 @@
 {#- renovate: depName=docker.io/pihole/pihole #}
 {%- set pihole_version = '2026.09.0' %}
 {#- renovate: depName=docker.io/klutchell/unbound #}
-{%- set unbound_version = '1.26.1' %}
+{%- set unbound_version = 'v1.26.2' %}
 ---
 quadlets:
   network:
