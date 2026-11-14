@@ -22,7 +22,7 @@
 {#- renovate: depName=ghcr.io/paperless-ngx/paperless-ngx #}
 {%- set paperless_version = '3.3.4' %}
 {#- renovate: depName=docker.io/library/redis #}
-{%- set paperless_redis_version = '7.4.12' %}
+{%- set paperless_redis_version = '8.10.3' %}
 {#- renovate: depName=docker.io/gotenberg/gotenberg #}
 {%- set paperless_gotenberg_version = '8.39.0' %}
 {#- renovate: depName=docker.io/apache/tika #}
