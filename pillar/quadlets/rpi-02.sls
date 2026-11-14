@@ -15,7 +15,7 @@
     under the same tag, so it only picks up rebuilds of the pinned version. #}
 {#- pihole is disabled below; same version as on rpi-01 #}
 {#- renovate: depName=docker.io/pihole/pihole #}
-{%- set pihole_version = '2026.10.0' %}
+{%- set pihole_version = '2026.11.0' %}
 {#- renovate: depName=docker.io/klutchell/unbound #}
 {%- set unbound_version = '1.24.2' %}
 {#- renovate: depName=ghcr.io/netbootxyz/netbootxyz #}

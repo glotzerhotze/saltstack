@@ -13,7 +13,7 @@
     (container_defaults: auto_update: registry) only looks for a newer image
     under the same tag, so it only picks up rebuilds of the pinned version. #}
 {#- renovate: depName=docker.io/pihole/pihole #}
-{%- set pihole_version = '2026.09.0' %}
+{%- set pihole_version = '2026.11.0' %}
 {#- renovate: depName=docker.io/klutchell/unbound #}
 {%- set unbound_version = '1.26.1' %}
 ---

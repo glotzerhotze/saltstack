@@ -15,7 +15,7 @@
 {#- renovate: depName=hub.klessen.cloud/glotzerhotze/docker-salt-master #}
 {%- set salt_master_version = '3008.5-gui' %}
 {#- renovate: depName=docker.io/pihole/pihole #}
-{%- set pihole_version = '2026.10.0' %}
+{%- set pihole_version = '2026.11.0' %}
 {#- renovate: depName=docker.io/klutchell/unbound #}
 {%- set unbound_version = '1.26.2' %}
 {#- TLS proxy in the salt-master pod #}
