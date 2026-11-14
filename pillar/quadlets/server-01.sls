@@ -24,7 +24,7 @@
 {#- renovate: depName=docker.io/library/redis #}
 {%- set paperless_redis_version = '7.4.12' %}
 {#- renovate: depName=docker.io/gotenberg/gotenberg #}
-{%- set paperless_gotenberg_version = '8.39.0' %}
+{%- set paperless_gotenberg_version = '8.40.0' %}
 {#- renovate: depName=docker.io/apache/tika #}
 {%- set paperless_tika_version = '4.1.0' %}
 {#- Stay on 2.x: InfluxDB 3 has a different storage engine and is no
