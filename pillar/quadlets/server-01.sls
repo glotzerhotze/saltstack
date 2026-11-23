@@ -20,7 +20,7 @@
     start command below is copied from the image (check it when raising
     paperless_tika_version) #}
 {#- renovate: depName=ghcr.io/paperless-ngx/paperless-ngx #}
-{%- set paperless_version = '3.4.2' %}
+{%- set paperless_version = '3.5.1' %}
 {#- renovate: depName=docker.io/library/redis #}
 {%- set paperless_redis_version = '8.10.3' %}
 {#- renovate: depName=docker.io/gotenberg/gotenberg #}
