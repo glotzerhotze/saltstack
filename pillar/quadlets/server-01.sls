@@ -42,13 +42,13 @@
 {#- Immich release for server and machine-learning, which must match. Read
     the release notes before raising it: https://github.com/immich-app/immich/releases #}
 {#- renovate: depName=ghcr.io/immich-app/immich-server #}
-{%- set immich_version = 'v3.4.1' %}
+{%- set immich_version = 'v3.4.2' %}
 {#- valkey and postgres for immich: tag and digest from the upstream
     docker-compose.yml of that release, so update them together with
     immich_version:
     https://github.com/immich-app/immich/releases/download/<version>/docker-compose.yml #}
 {#- renovate: depName=docker.io/valkey/valkey #}
-{%- set immich_valkey_version = '9@sha256:3add1a336a920ea54770a001ab6feb3da5fceea96a40373a3a2cd469b815f0b7' %}
+{%- set immich_valkey_version = '9@sha256:1c2b25b09f354c66fe994733acdf12fcfd4bdf6f3bd92b88a93a70378d884056' %}
 {#- renovate: depName=ghcr.io/immich-app/postgres #}
 {%- set immich_postgres_version = '14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23' %}
 ---
