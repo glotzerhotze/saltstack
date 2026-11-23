@@ -35,7 +35,7 @@
 {#- Stay on 2.x: InfluxDB 3 has a different storage engine and is no
     in-place upgrade #}
 {#- renovate: depName=docker.io/library/influxdb #}
-{%- set influxdb_version = '2.9.1' %}
+{%- set influxdb_version = '2.10.1' %}
 {#- TLS proxy in the paperless-ngx, influxdb and immich pods #}
 {#- renovate: depName=docker.io/library/haproxy #}
 {%- set haproxy_version = '3.4.7' %}
