@@ -26,7 +26,7 @@
 {#- renovate: depName=docker.io/gotenberg/gotenberg #}
 {%- set paperless_gotenberg_version = '8.40.0' %}
 {#- renovate: depName=docker.io/apache/tika #}
-{%- set paperless_tika_version = '3.3.3.0-full' %}
+{%- set paperless_tika_version = '3.3.3.1-full' %}
 {#- The 3.x images hold a single jar named after the Tika version, which is
     the tag without the image build number and suffix (3.3.3.0-full ->
     /tika-server-standard-3.3.3.jar). 4.x images use /opt/tika-server/
