@@ -20,7 +20,7 @@
 {%- set unbound_version = '1.26.2' %}
 {#- TLS proxy in the salt-master pod #}
 {#- renovate: depName=docker.io/library/haproxy #}
-{%- set haproxy_version = '3.4.7-alpine' %}
+{%- set haproxy_version = '3.4.8-alpine' %}
 ---
 quadlets:
   network:

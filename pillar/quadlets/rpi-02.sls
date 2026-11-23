@@ -26,7 +26,7 @@
 {#- renovate: depName=docker.io/grafana/grafana-dev #}
 {%- set grafana_version = '13.1.0-25957875840' %}
 {#- renovate: depName=docker.io/library/haproxy #}
-{%- set haproxy_version = '3.4.7' %}
+{%- set haproxy_version = '3.4.8' %}
 ---
 quadlets:
   network:

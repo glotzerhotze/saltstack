@@ -38,7 +38,7 @@
 {%- set influxdb_version = '2.9.1' %}
 {#- TLS proxy in the paperless-ngx, influxdb and immich pods #}
 {#- renovate: depName=docker.io/library/haproxy #}
-{%- set haproxy_version = '3.4.7' %}
+{%- set haproxy_version = '3.4.8' %}
 {#- Immich release for server and machine-learning, which must match. Read
     the release notes before raising it: https://github.com/immich-app/immich/releases #}
 {#- renovate: depName=ghcr.io/immich-app/immich-server #}
