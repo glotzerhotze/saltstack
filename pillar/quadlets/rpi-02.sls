@@ -19,7 +19,7 @@
 {#- renovate: depName=docker.io/klutchell/unbound #}
 {%- set unbound_version = 'v1.26.2' %}
 {#- renovate: depName=ghcr.io/netbootxyz/netbootxyz #}
-{%- set netbootxyz_version = '0.7.6-nbxyz27' %}
+{%- set netbootxyz_version = '0.7.6-nbxyz28' %}
 {#- grafana: a nightly build from grafana-dev (what grafana:main pointed to).
     For a stable version switch the image to docker.io/grafana/grafana with
     a release tag. #}
