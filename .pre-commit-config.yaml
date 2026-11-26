@@ -14,12 +14,12 @@ repos:
         files: \.(sls|jinja|j2|tmpl)$
 
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.35.1
+    rev: v1.38.0
     hooks:
       - id: yamllint
         exclude: \.sls$|^kitchen.*\.yml$   # Jinja/ERB isn't plain YAML
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.10.0.1
+    rev: v0.11.0.1-1
     hooks:
       - id: shellcheck
