@@ -21,6 +21,9 @@
 {#- TLS proxy in the salt-master pod #}
 {#- renovate: depName=docker.io/library/haproxy #}
 {%- set haproxy_version = '3.4.8-alpine' %}
+{#- ansible-controller: pin a version tag you have validated #}
+{#- renovate: depName=hub.klessen.cloud/glotzerhotze/ansible-controller #}
+{%- set ansible_controller_version = '2.22.0-1' %}
 ---
 quadlets:
   network:
@@ -258,3 +261,51 @@ quadlets:
             # fetch the root hints before every start, without blocking it
             Wants: unbound-root-hints.service
             After: unbound-root-hints.service
+
+    ansible-controller:
+      description: Ansible control node
+      ip: {{ ip('hosts:rpi-01:apps:ansible-controller:ipv4') }}
+      ip6: {{ ip('hosts:rpi-01:apps:ansible-controller:ipv6') }}
+      mac: "{{ mac('hosts:rpi-01:apps:ansible-controller:mac') }}"
+      # A run must not restart the container it runs in. Changes to this app
+      # (a new image tag, say) are written and take effect at the next
+      # restart, by hand when no run is going on:
+      #   ssh root@192.168.23.65 systemctl restart ansible-controller
+      restart_on_change: false
+      # podman volumes ansible-controller-repo (the repo, /srv/ansible) and
+      # ansible-controller-ssh (known_hosts), owned by the image's user
+      volumes:
+        repo:
+          Volume: &ansible_controller_volume
+            User: 1000
+            Group: 1000
+            Label: app=ansible-controller
+        ssh:
+          Volume: *ansible_controller_volume
+      containers:
+        ansible-controller:
+          image: hub.klessen.cloud/glotzerhotze/ansible-controller:{{ ansible_controller_version }}
+          environment:
+            TZ: Europe/Berlin
+            # The host this container runs on; reached on its shim address
+            # (inventory/group_vars/all/connection.yml)
+            ANSIBLE_CONTROLLER_HOST: rpi-01
+            # SSH key for root on all hosts, loaded into ssh-agent at start
+            # (control-node/entrypoint.sh). Its public key goes into
+            # /root/.ssh/authorized_keys on every host (MIGRATION.md).
+            ANSIBLE_SSH_KEY_REF: {{ salt['onepassword.read']('op://infra/tk-user/ssh-private-key') | yaml_dquote }}
+          volumes:
+            - volume: repo
+              target: /srv/ansible
+              options: Z
+            - volume: ssh
+              target: /home/ansible/.ssh
+              options: Z
+          Container:
+            # 1Password service account token as /run/secrets/op-token. Created
+            # by hand (MIGRATION.md): a run cannot create the secret it needs
+            # to read secrets.
+            Secret: ansible-op-token,type=mount,target=op-token,uid=1000,gid=1000,mode=0400
+          Service:
+            # if 1Password is unreachable, retry slowly (rate limit)
+            RestartSec: 30

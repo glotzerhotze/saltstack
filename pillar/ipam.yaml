@@ -52,6 +52,10 @@ hosts:
         ipv4: 192.168.23.98
         ipv6: 'fd42:ac1d:feed:1::62'
         mac:  '02:ac:1d:fe:ed:62'
+      ansible-controller:
+        ipv4: 192.168.23.108
+        ipv6: 'fd42:ac1d:feed:1::6c'
+        mac:  '02:ac:1d:fe:ed:6c'
 
   rpi-02:
     mgmt:   {ipv4: 192.168.23.66}

@@ -50,10 +50,25 @@ telegraf:
       kernel: true
       mem: true
       net: true
-      processes: true
       swap: true
       system: true
-
+      dns_query:
+        servers: [ "192.168.23.3", "192.168.23.33" ]
+      docker:
+        endpoint: "unix:///run/podman/podman.sock"
+        source_tag: true
+      linux_cpu: true
+      linux_sysctl_fs: true
+      netstat: true
+      processes:
+        use_sudo: true
+      socketstat: true
+      systemd_units:
+        unittype: "service, timer"
+        scope: system
+        collect_disabled_units: false
+        details: true
+        timeout: "5s"
     output:
       influxdb_v2:
         # haproxy in the influxdb pod, Let's Encrypt certificate
