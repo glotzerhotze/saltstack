@@ -1,0 +1,19 @@
+# Grains for scripts/test.sh (suite "default"). They override the core
+# grains of the machine running the test, so states render as on a Debian
+# trixie amd64 host instead of, say, macOS. Grains not listed here still come
+# from that machine.
+os: Debian
+os_family: Debian
+osfullname: Debian GNU/Linux
+oscodename: trixie
+osrelease: '13'
+osmajorrelease: 13
+osrelease_info: [13]
+osfinger: Debian-13
+osarch: amd64
+cpuarch: x86_64
+kernel: Linux
+init: systemd
+virtual: physical
+productname: Generic PC
+transactional: false

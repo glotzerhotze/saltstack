@@ -6,8 +6,9 @@ trixie hosts and Raspberry Pis). The master is a SaltGUI build of
 running under Podman on rpi-01 (`192.168.23.65`) as the container
 `salt-master-app` in the pod `salt-master` (systemd unit `salt-master-pod`),
 with haproxy in front of SaltGUI. The pod is itself a quadlet from
-`pillar/quadlets/rpi-01.sls`. Nothing in this repo runs locally. You edit
-files here, then `scripts/deploy.sh` rsyncs them into the container's volumes.
+`pillar/quadlets/rpi-01.sls`. Nothing in this repo is applied locally
+(`scripts/test.sh` only renders). You edit files here, then
+`scripts/deploy.sh` rsyncs them into the container's volumes.
 
 ## Layout and where it lands in the container
 
@@ -93,6 +94,17 @@ Container conventions to follow:
 - `scripts/deploy.sh`: rsyncs everything above to the master with
   `--delete`, then restarts it. The local tree is the source of truth: a file
   deleted here also disappears on the master.
+- `scripts/test.sh [-s suite] [-j jobs] [sls ...]`: renders SLS locally with
+  `salt-call --local state.show_sls` (every SLS under `salt/` by default),
+  with `salt/` and `3pfs/*` as file_roots. Pillar comes from
+  `test/pillar/<suite>/`, grains from `test/grains/<suite>.yaml` (falls
+  back to `default.yaml`). The rendered states land in `test/out/<suite>/`
+  (gitignored). Needs a local `salt-call` (`/opt/salt/salt-call` here).
+- `test/pillar/default/`: test pillar. Several files are symlinks to the
+  formula's `pillar.example`, so editing an example changes the test. Use
+  placeholders only: test pillar never calls `onepassword.*`. Its `top.sls`
+  has no `ignore_missing`, so a misnamed file fails the run. A new formula
+  needs an entry there, or its states render with defaults only.
 - `renovate.json`, `.github/workflows/renovate.yml`: Renovate runs weekly on
   GitHub and opens pull requests for newer image tags in
   `pillar/quadlets/*.sls`. Every `{%- set <name>_version = '<tag>' %}` there
@@ -161,10 +173,13 @@ Rules:
 
 ## Validating changes
 
-There is no local Salt or CI. Before suggesting a deploy:
+There is no CI. Before suggesting a deploy:
 
-1. Check that the YAML parses and the Jinja is balanced (read it carefully;
-   `python -c 'import yaml'` only helps on files without Jinja).
+1. Run `scripts/test.sh` (or `scripts/test.sh <sls> ...` for the formulas
+   you touched). It must exit 0. It only covers `salt/` with test pillar:
+   it does not render the real `pillar/` tree (that needs 1Password on the
+   master) or `top.sls`, so also check that the YAML in `pillar/` parses
+   and its Jinja is balanced.
 2. After deploying, check on the master, as a dry run first:
 
    ```bash

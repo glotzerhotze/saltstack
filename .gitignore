@@ -2,3 +2,4 @@ config/onepassword.token
 ./scripts/netboot.xyz/menu/trixie.ipxe
 .DS_Store
 .idea/
+test/out/

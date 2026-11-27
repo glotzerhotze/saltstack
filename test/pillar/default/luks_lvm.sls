@@ -1,0 +1,1 @@
+../../../salt/luks_lvm/pillar.example

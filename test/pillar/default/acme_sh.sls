@@ -1,0 +1,1 @@
+../../../salt/acme_sh/pillar.example

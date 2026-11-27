@@ -1,0 +1,1 @@
+../../../salt/quadlets/pillar.example.sls

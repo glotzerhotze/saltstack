@@ -1,0 +1,1 @@
+../../../salt/nm_connections/pillar.example
