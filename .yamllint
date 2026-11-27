@@ -1,0 +1,32 @@
+---
+extends: default
+
+yaml-files:
+  - '*.yaml'
+  - '*.yml'
+  - .yamllint
+  - .salt-lint
+  # Salt master drop-ins are plain YAML (no Jinja)
+  - 'config/*.conf'
+
+rules:
+  # Salt's defaults.yaml/master config and GitHub workflows don't use ---
+  document-start: disable
+  # same limit as salt-lint rule 204
+  line-length:
+    max: 160
+  # Renovate writes "<digest> # vX.Y.Z" with a single space
+  comments:
+    min-spaces-from-content: 1
+  truthy:
+    # Salt's own docs and this repo's states write True/False
+    allowed-values: ['true', 'false', 'True', 'False']
+    # GitHub Actions' top-level `on:` key
+    check-keys: false
+  # Salt's docs nest lists without indenting them (config/10-reactor.conf)
+  indentation:
+    indent-sequences: whatever
+  # pillar/ipam.yaml aligns its flow mappings in columns
+  colons:
+    ignore: |
+      pillar/ipam.yaml

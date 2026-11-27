@@ -13,6 +13,7 @@ set -o pipefail
 ##
 ### source environment first and make sure nothing is empty
 ##
+# shellcheck source=/dev/null
 source /etc/net_env.var
 : "${NETDEV:?}" "${IP:?}" "${GW:?}" "${DNS1:?}" "${DNS2:?}" "${DOMAIN:?}"
 

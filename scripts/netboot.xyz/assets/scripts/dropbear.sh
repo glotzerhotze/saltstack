@@ -6,6 +6,7 @@ set -o pipefail
 ##
 ### source environment first
 ##
+# shellcheck source=/dev/null
 source /etc/net_env.var
 
 ##

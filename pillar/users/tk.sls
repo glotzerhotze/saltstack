@@ -87,7 +87,7 @@ users:
     # Generates an authorized_keys file for the user
     # with the given keys
     ssh_auth_file:
-    - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC4Gk+zdKj3YE2BqQ3xe6VL/7WPZGjj0Qq7yNxlbK1Nrgfhr1600XlRMnXApeLri7Bs3IArOyV2X8RBCJ7TMoL9b/tYKT/3RAT23625urVz7UtayzcVzOjM9azEaKQVI57WRtJvOOEUzTI9pLef45gGrYQznJa95qY8/4aMSV3fbif/VkkeUKzc9DiQUOQj2T3/7FHorNsri6iNmBvTxraxUUwsiJc1r3clDNSpZiZZ2vwmqRigz/OJe+jmlULN2rKdrnsD7k7s6GDsL5BlEYviGqsdhqwfSTzJQkXQghzwlvtrpt8bSqUcrxGCjFfx/SSMybbE7mYqiDz6XpcexlLL tk@homebox.homework.lan
+    - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC4Gk+zdKj3YE2BqQ3xe6VL/7WPZGjj0Qq7yNxlbK1Nrgfhr1600XlRMnXApeLri7Bs3IArOyV2X8RBCJ7TMoL9b/tYKT/3RAT23625urVz7UtayzcVzOjM9azEaKQVI57WRtJvOOEUzTI9pLef45gGrYQznJa95qY8/4aMSV3fbif/VkkeUKzc9DiQUOQj2T3/7FHorNsri6iNmBvTxraxUUwsiJc1r3clDNSpZiZZ2vwmqRigz/OJe+jmlULN2rKdrnsD7k7s6GDsL5BlEYviGqsdhqwfSTzJQkXQghzwlvtrpt8bSqUcrxGCjFfx/SSMybbE7mYqiDz6XpcexlLL tk@homebox.homework.lan  # noqa 204
     - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFoWv7STNMUVkQWz0Ns/Ixf2g3RIA5gZw426VAxmr+fr tk@homelab
     # ... or you can pull them from a different pillar similar to ssh_keys_pillar
     #ssh_auth_pillar:

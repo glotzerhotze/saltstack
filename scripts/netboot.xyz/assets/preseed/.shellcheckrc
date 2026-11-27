@@ -1,0 +1,4 @@
+# The preseed scripts read their settings from environment variables that
+# debian-installer sets from the kernel command line (menu/trixie.ipxe), so
+# they are never assigned in the scripts themselves.
+disable=SC2154

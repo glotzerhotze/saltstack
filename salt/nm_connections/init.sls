@@ -151,7 +151,7 @@ nm_connections_conf_apply:
 {%-   else %}
 
 {#-   Normalise "section.key: value" and "section: {key: value}" into
-      {section: {key: value}}. The split is on the first dot only, so
+      {section: {key: value} }. The split is on the first dot only, so
       [user] keys such as "user.org.example.tag" keep their dots. #}
 {%-     set sections = {} %}
 {%-     for prop, value in (conn.get('settings') or {}).items() %}

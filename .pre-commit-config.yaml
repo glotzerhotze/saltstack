@@ -1,3 +1,4 @@
+---
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -6,6 +7,10 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-merge-conflict
+      - id: check-json              # renovate.json
+      - id: check-added-large-files
+      - id: detect-private-key
+        exclude: pillar\.example(\.sls)?$   # placeholder keys
 
   - repo: https://github.com/warpnet/salt-lint
     rev: v0.9.2
@@ -17,7 +22,10 @@ repos:
     rev: v1.38.0
     hooks:
       - id: yamllint
-        exclude: \.sls$|^kitchen.*\.yml$   # Jinja/ERB isn't plain YAML
+        # also lint the master drop-ins in config/, which are plain YAML
+        # (.sls is Jinja first and is covered by salt-lint)
+        types: [file]
+        files: \.ya?ml$|^config/.*\.conf$|^\.(yamllint|salt-lint)$
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1-1

@@ -95,7 +95,7 @@
 {{-       raise("luks_lvm: device '" ~ name ~ "': invalid VG name '" ~ raw.vg ~ "'") }}
 {%-     endif %}
 {%-     if raw.vg not in vgs %}
-{%-       do vgs.update({raw.vg: {"name": raw.vg, "devices": [], "lvs": []}}) %}
+{%-       do vgs.update({raw.vg: {"name": raw.vg, "devices": [], "lvs": []} }) %}
 {%-     endif %}
 {%-     do vgs[raw.vg].devices.append(name) %}
 {%-   endif %}

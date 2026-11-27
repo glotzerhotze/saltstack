@@ -11,6 +11,7 @@
 ## that lists the disk ids found, and clear partman-auto/method, so partman
 ## does not pick a disk and partition it on its own.
 
+# shellcheck source=/dev/null
 . /usr/share/debconf/confmodule
 
 byid=/dev/disk/by-id

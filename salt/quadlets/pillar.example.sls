@@ -112,8 +112,15 @@ quadlets:
             # --resolve avoids needing DNS; the temp file keeps a failed
             # download from replacing a good named.root
             ExecStart:
-              - /usr/bin/curl --fail --silent --show-error --resolve www.internic.net:443:192.0.46.9 -o /var/lib/containers/storage/volumes/unbound-etc/_data/named.root.tmp https://www.internic.net/domain/named.root
-              - /usr/bin/mv -f /var/lib/containers/storage/volumes/unbound-etc/_data/named.root.tmp /var/lib/containers/storage/volumes/unbound-etc/_data/named.root
+              - >-
+                /usr/bin/curl --fail --silent --show-error
+                --resolve www.internic.net:443:192.0.46.9
+                -o /var/lib/containers/storage/volumes/unbound-etc/_data/named.root.tmp
+                https://www.internic.net/domain/named.root
+              - >-
+                /usr/bin/mv -f
+                /var/lib/containers/storage/volumes/unbound-etc/_data/named.root.tmp
+                /var/lib/containers/storage/volumes/unbound-etc/_data/named.root
         unbound-root-hints.timer:
           Unit:
             Description: Daily refresh of the unbound root hints

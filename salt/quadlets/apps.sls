@@ -52,7 +52,7 @@ include:
     - stdin: {{ s.value | yaml_dquote }}
     - env:
       - QUADLET_SECRET: {{ s.value | yaml_dquote }}
-    - unless: '[ "$(podman secret inspect --showsecret --format "{{ '{{.SecretData}}' }}" {{ s.name }} 2>/dev/null)" = "$QUADLET_SECRET" ]'
+    - unless: '[ "$(podman secret inspect --showsecret --format "{{ '{{ .SecretData }}' }}" {{ s.name }} 2>/dev/null)" = "$QUADLET_SECRET" ]'
     - hide_output: True
     - output_loglevel: quiet
 {%-       if quadlet.manage_package %}

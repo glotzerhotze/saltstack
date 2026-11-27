@@ -401,7 +401,9 @@
 {%-     endif %}
 {%-     if use_pod %}
 {%-       for key in (c.get('Container') or {}) if key in pod_owned_keys %}
-{%-         do errors.append(cwhere ~ ': Container:' ~ key ~ ' is not allowed in a pod; the pod owns network, hostname, DNS and ports (set them on the app or under apps:' ~ app_name ~ ':Pod:)') %}
+{%-         do errors.append(cwhere ~ ': Container:' ~ key ~ ' is not allowed in a pod;'
+                ~ ' the pod owns network, hostname, DNS and ports'
+                ~ ' (set them on the app or under apps:' ~ app_name ~ ':Pod:)') %}
 {%-       endfor %}
 {%-     endif %}
 
@@ -550,7 +552,9 @@
 {%-     set rel = path[config_dir | length + 1:] %}
 {%-     set base = rel.split('/')[-1] %}
 {%-     if base in expected_by_base and rel != expected_by_base[base] and not salt['file.search'](path, '^' ~ q_marker | regex_escape) %}
-{%-       do errors.append('unit ' ~ base ~ ' would be written to ' ~ config_dir ~ '/' ~ expected_by_base[base] ~ ', but a hand-written ' ~ path ~ ' already exists; remove it first') %}
+{%-       do errors.append('unit ' ~ base ~ ' would be written to '
+              ~ config_dir ~ '/' ~ expected_by_base[base]
+              ~ ', but a hand-written ' ~ path ~ ' already exists; remove it first') %}
 {%-     endif %}
 {%-   endfor %}
 {%- endif %}

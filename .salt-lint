@@ -1,0 +1,10 @@
+---
+skip_list:
+  # The hook also feeds .jinja templates (see .pre-commit-config.yaml) so the
+  # Jinja rules run on them; 205 would just flag every one for not being .sls.
+  - 205
+rules:
+  # Example pillar shipped next to a formula, never meant to be referenced.
+  214:
+    ignore: |
+      pillar.example.sls

@@ -23,8 +23,10 @@
       'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
       'export PATH',
     ] %}
-{#- succeeds if acme.sh recorded <field> at or after every file's mtime #}
-{%- set newer_check = '[ -f "$1" ] && . "$1" && t=${%s:-0} && shift && for f; do [ "$t" -ge "$(stat -c %%Y "$f")" ] || exit 1; done' %}
+{#- succeeds if acme.sh recorded FIELD at or after every file's mtime #}
+{%- set newer_check = '[ -f "$1" ] && . "$1" && t=${FIELD:-0} && shift && for f; do [ "$t" -ge "$(stat -c %Y "$f")" ] || exit 1; done' %}
+{%- set issue_check = newer_check | replace('FIELD', 'Le_CertCreateTime') | quote %}
+{%- set install_check = newer_check | replace('FIELD', 'Le_InstallCertSuccessTime') | quote %}
 
 include:
   - .install
@@ -268,7 +270,7 @@ include:
 {%-   endif %}
     - unless:
       - test -s {{ acme_files.fullchain | quote }}
-      - sh -c {{ (newer_check | format('Le_CertCreateTime')) | quote }} _ {{ acme_conf | quote }} {{ (sdir ~ '/issue.conf') | quote }}
+      - sh -c {{ issue_check }} _ {{ acme_conf | quote }} {{ (sdir ~ '/issue.conf') | quote }}
     - require:
       - cmd: acme_sh_install
       - file: {{ sid }}_dir
@@ -283,7 +285,7 @@ include:
   cmd.run:
     - name: {{ (acme_sh.command + ['--install-cert'] + cert_args + install) | map('quote') | join(' ') | tojson }}
     - unless:
-      - sh -c {{ (newer_check | format('Le_InstallCertSuccessTime')) | quote }} _ {{ acme_conf | quote }} {{ (sdir ~ '/install.conf') | quote }} {{ (sdir ~ '/reload') | quote }}
+      - sh -c {{ install_check }} _ {{ acme_conf | quote }} {{ (sdir ~ '/install.conf') | quote }} {{ (sdir ~ '/reload') | quote }}
       - sh -c '[ -f "$1" ] && . "$1" && [ "${Le_InstallCertSuccessTime:-0}" -ge "${Le_CertCreateTime:-0}" ]' _ {{ acme_conf | quote }}
 {%-   for kind, path in dest | dictsort %}
       - cmp -s {{ acme_files[kind] | quote }} {{ path | quote }}
